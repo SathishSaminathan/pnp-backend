@@ -64,6 +64,8 @@ const parseCoord = value => {
   return Number.isFinite(n) ? n : null;
 };
 
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
 const parseOrigin = value => {
   if (!value || typeof value !== 'object') return null;
   const latitude = parseCoord(value.latitude ?? value.lat);
@@ -80,12 +82,11 @@ const parseBounds = (bounds, fallback = {}) => {
   const minLng = parseCoord(source.minLng ?? source.min_lng);
   const maxLng = parseCoord(source.maxLng ?? source.max_lng);
   if ([minLat, maxLat, minLng, maxLng].some(item => item == null)) return null;
-  if (Math.abs(minLat) > 90 || Math.abs(maxLat) > 90 || Math.abs(minLng) > 180 || Math.abs(maxLng) > 180) return null;
   return {
-    minLat: Math.min(minLat, maxLat),
-    maxLat: Math.max(minLat, maxLat),
-    minLng: Math.min(minLng, maxLng),
-    maxLng: Math.max(minLng, maxLng),
+    minLat: clamp(Math.min(minLat, maxLat), -90, 90),
+    maxLat: clamp(Math.max(minLat, maxLat), -90, 90),
+    minLng: clamp(Math.min(minLng, maxLng), -180, 180),
+    maxLng: clamp(Math.max(minLng, maxLng), -180, 180),
   };
 };
 
