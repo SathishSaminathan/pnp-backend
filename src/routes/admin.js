@@ -58,23 +58,7 @@ router.get('/users', (req, res) => {
   res.json({ items, total: items.length });
 });
 
-router.get('/users/:userId', (req, res, next) => {
-  try {
-    const db = readDb();
-    const user = db.users.find(item => item.id === req.params.userId);
-    if (!user) throw new HttpError(404, 'User not found');
-    res.json({
-      ...enrichUser(user, db),
-      bookings: db.bookings.filter(item => item.userId === user.id),
-      favorites: db.toilets.filter(item => (user.favoriteToiletIds || []).includes(item.id)),
-      toilets: db.toilets.filter(item => item.ownerId === user.id),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.patch('/users/:userId/block', (req, res, next) => {
+const setUserBlocked = (req, res, next) => {
   try {
     const blocked = Boolean(req.body?.blocked);
     const reason = String(req.body?.reason || '').trim();
@@ -97,6 +81,26 @@ router.patch('/users/:userId/block', (req, res, next) => {
     });
 
     res.json(enrichUser(saved, readDb()));
+  } catch (error) {
+    next(error);
+  }
+};
+
+router.patch('/users/:userId/block', setUserBlocked);
+router.put('/users/:userId/block', setUserBlocked);
+router.post('/users/:userId/block', setUserBlocked);
+
+router.get('/users/:userId', (req, res, next) => {
+  try {
+    const db = readDb();
+    const user = db.users.find(item => item.id === req.params.userId);
+    if (!user) throw new HttpError(404, 'User not found');
+    res.json({
+      ...enrichUser(user, db),
+      bookings: db.bookings.filter(item => item.userId === user.id),
+      favorites: db.toilets.filter(item => (user.favoriteToiletIds || []).includes(item.id)),
+      toilets: db.toilets.filter(item => item.ownerId === user.id),
+    });
   } catch (error) {
     next(error);
   }
