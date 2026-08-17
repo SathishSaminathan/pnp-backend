@@ -4,6 +4,7 @@ const { HttpError, publicUser } = require('../utils');
 const { readDb, updateDb } = require('../store/db');
 const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../middleware/auth');
 const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
+const { listFavoriteToilets } = require('../services/favorites');
 const { adminMaster, assertKey, normalizeItem } = require('../services/master');
 
 const router = express.Router();
@@ -98,7 +99,7 @@ router.get('/users/:userId', (req, res, next) => {
     res.json({
       ...enrichUser(user, db),
       bookings: db.bookings.filter(item => item.userId === user.id),
-      favorites: db.toilets.filter(item => (user.favoriteToiletIds || []).includes(item.id)),
+      favorites: listFavoriteToilets(db, user),
       toilets: db.toilets.filter(item => item.ownerId === user.id),
     });
   } catch (error) {

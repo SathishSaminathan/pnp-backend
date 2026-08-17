@@ -3,6 +3,7 @@ const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
 const { facilityValues } = require('../services/master');
+const { listFavoriteToilets, toggleFavorite } = require('../services/favorites');
 
 const router = express.Router();
 
@@ -32,6 +33,10 @@ router.get('/mine', (req, res) => {
   res.json(toilets);
 });
 
+router.get('/favorites', (req, res) => {
+  res.json(listFavoriteToilets(readDb(), req.user));
+});
+
 router.get('/:toiletId/bookings', (req, res) => {
   const db = readDb();
   getToiletOrThrow(db, req.params.toiletId);
@@ -51,20 +56,31 @@ router.get('/:toiletId', (req, res, next) => {
 router.post('/:toiletId/favorite', (req, res, next) => {
   try {
     const { toiletId } = req.params;
+    const requested = req.body?.favorite;
     let mapped;
 
     updateDb(db => {
-      getToiletOrThrow(db, toiletId);
-      db.users = db.users.map(item => {
-        if (item.id !== req.user.id) return item;
-        const favorites = item.favoriteToiletIds || [];
-        const nextFavorites = favorites.includes(toiletId)
-          ? favorites.filter(id => id !== toiletId)
-          : [...favorites, toiletId];
-        req.user = { ...item, favoriteToiletIds: nextFavorites };
-        return req.user;
-      });
-      mapped = mapToilet(getToiletOrThrow(db, toiletId), req.user, db.reviews);
+      const result = toggleFavorite(db, req.user.id, toiletId, requested);
+      req.user = result.user;
+      mapped = result.toilet;
+      return db;
+    });
+
+    res.json(mapped);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:toiletId/favorite', (req, res, next) => {
+  try {
+    const { toiletId } = req.params;
+    let mapped;
+
+    updateDb(db => {
+      const result = toggleFavorite(db, req.user.id, toiletId, false);
+      req.user = result.user;
+      mapped = result.toilet;
       return db;
     });
 

@@ -57,3 +57,25 @@ CREATE TABLE IF NOT EXISTS master_data (
   key TEXT PRIMARY KEY,
   items JSONB NOT NULL DEFAULT '[]'::jsonb
 );
+
+CREATE TABLE IF NOT EXISTS user_favorites (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  toilet_id TEXT NOT NULL REFERENCES toilets(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, toilet_id)
+);
+
+CREATE INDEX IF NOT EXISTS user_favorites_user_idx ON user_favorites (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS user_favorites_toilet_idx ON user_favorites (toilet_id);
+
+INSERT INTO user_favorites (user_id, toilet_id, created_at)
+SELECT u.id, fav.id, NOW()
+FROM users u
+CROSS JOIN LATERAL jsonb_array_elements_text(
+  CASE
+    WHEN jsonb_typeof(COALESCE(u.favorite_toilet_ids, '[]'::jsonb)) = 'array' THEN u.favorite_toilet_ids
+    ELSE '[]'::jsonb
+  END
+) AS fav(id)
+WHERE EXISTS (SELECT 1 FROM toilets t WHERE t.id = fav.id)
+ON CONFLICT DO NOTHING;

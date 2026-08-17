@@ -1,6 +1,7 @@
 const express = require('express');
 const { readDb } = require('../store/db');
 const { listToilets } = require('../services/toilets');
+const { listFavoriteToilets } = require('../services/favorites');
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ router.post('/feed', (req, res) => {
 
   res.json({
     nearbyToilets: filtered.slice(0, 4),
-    favoriteToilets: filtered.filter(item => item.isFavorite),
+    favoriteToilets: listFavoriteToilets(db, req.user),
     recentSearches: ['Central Station', 'Marina Beach', 'OMR'],
   });
 });

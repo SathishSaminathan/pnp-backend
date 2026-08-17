@@ -24,20 +24,33 @@ const mergeMaster = db => {
   return db;
 };
 
+const parseFavoriteIds = value => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 const mapUser = row => ({
   id: row.id,
   phone: row.phone,
   name: row.name || '',
   city: row.city || '',
   profileCompleted: Boolean(row.profile_completed),
-  favoriteToiletIds: Array.isArray(row.favorite_toilet_ids) ? row.favorite_toilet_ids : [],
+  favoriteToiletIds: parseFavoriteIds(row.favorite_toilet_ids),
   blocked: Boolean(row.blocked),
   blockedAt: row.blocked_at ? new Date(row.blocked_at).toISOString() : null,
   blockedReason: row.blocked_reason || '',
 });
 
 const loadFromPostgres = async () => {
-  const [users, toilets, bookings, reviews, notifications, transactions, masterRows] = await Promise.all([
+  const [users, toilets, bookings, reviews, notifications, transactions, masterRows, favorites] = await Promise.all([
     query('SELECT * FROM users ORDER BY created_at ASC, id ASC'),
     query('SELECT data FROM toilets'),
     query('SELECT data FROM bookings'),
@@ -45,6 +58,7 @@ const loadFromPostgres = async () => {
     query('SELECT data FROM notifications'),
     query('SELECT data FROM transactions'),
     query('SELECT key, items FROM master_data'),
+    query('SELECT user_id, toilet_id FROM user_favorites ORDER BY created_at ASC'),
   ]);
 
   const master = createDefaultMaster();
@@ -52,8 +66,20 @@ const loadFromPostgres = async () => {
     master[row.key] = row.items;
   });
 
+  const favoritesByUser = {};
+  favorites.rows.forEach(row => {
+    if (!favoritesByUser[row.user_id]) favoritesByUser[row.user_id] = [];
+    favoritesByUser[row.user_id].push(row.toilet_id);
+  });
+
   return mergeMaster({
-    users: users.rows.map(mapUser),
+    users: users.rows.map(row => {
+      const mapped = mapUser(row);
+      if (favoritesByUser[row.id]) {
+        mapped.favoriteToiletIds = favoritesByUser[row.id];
+      }
+      return mapped;
+    }),
     toilets: toilets.rows.map(row => row.data),
     bookings: bookings.rows.map(row => row.data),
     reviews: reviews.rows.map(row => row.data),
@@ -112,6 +138,8 @@ const persistToPostgres = async db => {
       );
     }
 
+    await client.query('DELETE FROM user_favorites');
+
     await replaceJsonRows(client, 'toilets', db.toilets || [], (tx, item) =>
       tx.query(
         `INSERT INTO toilets (id, owner_id, data, updated_at)
@@ -120,6 +148,20 @@ const persistToPostgres = async db => {
         [item.id, item.ownerId, JSON.stringify(item)],
       ),
     );
+
+    const favoriteRows = (db.users || []).flatMap(user =>
+      (user.favoriteToiletIds || []).map(toiletId => ({ userId: user.id, toiletId })),
+    );
+    const toiletIds = new Set((db.toilets || []).map(item => item.id));
+    for (const row of favoriteRows) {
+      if (!toiletIds.has(row.toiletId)) continue;
+      await client.query(
+        `INSERT INTO user_favorites (user_id, toilet_id, created_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (user_id, toilet_id) DO NOTHING`,
+        [row.userId, row.toiletId],
+      );
+    }
 
     await replaceJsonRows(client, 'bookings', db.bookings || [], (tx, item) =>
       tx.query(

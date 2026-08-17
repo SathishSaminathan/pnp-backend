@@ -1,10 +1,11 @@
 const { DISCOVERY_FILTER_DEFAULTS } = require('../constants');
 const { isBlocked, isOpenNow } = require('../utils');
 const { publicMaster } = require('./master');
+const { isFavorite } = require('./favorites');
 
 const mapToilet = (toilet, user, reviews) => ({
   ...toilet,
-  isFavorite: Boolean(user?.favoriteToiletIds?.includes(toilet.id)),
+  isFavorite: isFavorite(user, toilet.id),
   reviews: (reviews || []).filter(review => review.toiletId === toilet.id),
 });
 
@@ -35,9 +36,9 @@ const listToilets = ({ db, user, search = '', filters = DISCOVERY_FILTER_DEFAULT
           .some(value => String(value).toLowerCase().includes(query));
 
       if (!matchesQuery) return false;
+      if (normalizedFilters.favoritesOnly) return toilet.isFavorite;
       if (normalizedFilters.openNow && !isOpenNow(toilet.operatingHours)) return false;
       if (normalizedFilters.verifiedOnly && !toilet.verified) return false;
-      if (normalizedFilters.favoritesOnly && !toilet.isFavorite) return false;
       if (toilet.basePrice > Number(normalizedFilters.maxPrice || DISCOVERY_FILTER_DEFAULTS.maxPrice)) return false;
       if (toilet.rating < Number(normalizedFilters.minRating || 0)) return false;
       if (toilet.distanceKm > Number(normalizedFilters.maxDistanceKm || DISCOVERY_FILTER_DEFAULTS.maxDistanceKm)) return false;
