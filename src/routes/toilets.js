@@ -1,8 +1,8 @@
 const express = require('express');
-const { FACILITIES } = require('../constants');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
+const { facilityValues } = require('../services/master');
 
 const router = express.Router();
 
@@ -85,12 +85,12 @@ router.post('/', (req, res) => {
       rating: 0,
       reviewCount: 0,
       verified: false,
-      availability: payload.availability || 'AVAILABLE',
+      availability: payload.availability || (db.master?.availability || []).find(item => item.active !== false)?.value || 'AVAILABLE',
       distanceKm: 0,
       priceLabel: 'Per use',
       basePrice: Number(payload.basePrice || 20),
       photos: payload.photos || ['https://picsum.photos/seed/pnp-new-toilet/800/500'],
-      facilities: payload.facilities || FACILITIES.slice(0, 6),
+      facilities: payload.facilities || facilityValues(db).slice(0, 6),
       coordinates: payload.coordinates || { latitude: 13.05, longitude: 80.27 },
       address: payload.address || {
         line1: 'Added Address',

@@ -1,9 +1,10 @@
 const express = require('express');
 const config = require('../config');
 const { HttpError, publicUser } = require('../utils');
-const { readDb } = require('../store/db');
+const { readDb, updateDb } = require('../store/db');
 const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../middleware/auth');
 const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
+const { adminMaster, assertKey, normalizeItem } = require('../services/master');
 
 const router = express.Router();
 
@@ -129,6 +130,74 @@ router.get('/reviews', (_req, res) => {
     toiletName: db.toilets.find(item => item.id === review.toiletId)?.name || '',
   }));
   res.json({ items, total: items.length });
+});
+
+router.get('/master', (_req, res) => {
+  res.json(adminMaster(readDb()));
+});
+
+router.post('/master/:type', (req, res, next) => {
+  try {
+    const { type } = req.params;
+    assertKey(type);
+    let created;
+
+    updateDb(db => {
+      const list = db.master[type] || [];
+      created = normalizeItem(type, { ...req.body, sortOrder: req.body?.sortOrder || list.length + 1 });
+      if (list.some(item => item.value.toLowerCase() === created.value.toLowerCase())) {
+        throw new HttpError(400, 'That value already exists');
+      }
+      db.master[type] = [...list, created];
+      return db;
+    });
+
+    res.status(201).json(created);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/master/:type/:id', (req, res, next) => {
+  try {
+    const { type, id } = req.params;
+    assertKey(type);
+    let saved;
+
+    updateDb(db => {
+      const list = db.master[type] || [];
+      const current = list.find(item => item.id === id);
+      if (!current) throw new HttpError(404, 'Master item not found');
+      saved = normalizeItem(type, req.body || {}, current);
+      if (list.some(item => item.id !== id && item.value.toLowerCase() === saved.value.toLowerCase())) {
+        throw new HttpError(400, 'That value already exists');
+      }
+      db.master[type] = list.map(item => (item.id === id ? saved : item));
+      return db;
+    });
+
+    res.json(saved);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/master/:type/:id', (req, res, next) => {
+  try {
+    const { type, id } = req.params;
+    assertKey(type);
+    updateDb(db => {
+      const list = db.master[type] || [];
+      if (!list.some(item => item.id === id)) {
+        throw new HttpError(404, 'Master item not found');
+      }
+      db.master[type] = list.filter(item => item.id !== id);
+      return db;
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;

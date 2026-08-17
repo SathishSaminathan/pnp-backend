@@ -1,4 +1,4 @@
-const { FACILITIES, BOOKING_STATUS } = require('../constants');
+const { FACILITIES, BOOKING_STATUS, createDefaultMaster } = require('../constants');
 
 const createSeed = () => {
   const users = [
@@ -224,7 +224,7 @@ const createSeed = () => {
     },
   ];
 
-  return { users, toilets, bookings, reviews, notifications, transactions };
+  return { users, toilets, bookings, reviews, notifications, transactions, master: createDefaultMaster() };
 };
 
 module.exports = { createSeed };

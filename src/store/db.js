@@ -1,12 +1,30 @@
 const fs = require('fs');
 const path = require('path');
 const { createSeed } = require('./seed');
+const { createDefaultMaster } = require('../constants');
 
 const DATA_DIR = path.join(__dirname, '../../data');
 const DATA_FILE = path.join(DATA_DIR, 'db.json');
 
 let cache = null;
 let writeQueue = Promise.resolve();
+
+const mergeMaster = db => {
+  const defaults = createDefaultMaster();
+  if (!db.master || typeof db.master !== 'object') {
+    db.master = defaults;
+    return true;
+  }
+
+  let changed = false;
+  ['categories', 'availability', 'facilities'].forEach(key => {
+    if (!Array.isArray(db.master[key]) || !db.master[key].length) {
+      db.master[key] = defaults[key];
+      changed = true;
+    }
+  });
+  return changed;
+};
 
 const ensureStore = () => {
   if (!fs.existsSync(DATA_DIR)) {
@@ -21,6 +39,9 @@ const readDb = () => {
   ensureStore();
   if (!cache) {
     cache = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    if (mergeMaster(cache)) {
+      persist(cache);
+    }
   }
   return cache;
 };

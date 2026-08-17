@@ -14,6 +14,7 @@ const earningsRoutes = require('./routes/earnings');
 const reviewRoutes = require('./routes/reviews');
 const notificationRoutes = require('./routes/notifications');
 const adminRoutes = require('./routes/admin');
+const masterRoutes = require('./routes/master');
 
 const createApp = () => {
   const app = express();
@@ -54,6 +55,7 @@ const createApp = () => {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/master', requireAuth, masterRoutes);
   app.use('/api/profile', requireAuth, profileRoutes);
   app.use('/api/home', requireAuth, homeRoutes);
   app.use('/api/toilets', requireAuth, toiletRoutes);

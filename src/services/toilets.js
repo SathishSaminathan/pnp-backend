@@ -1,5 +1,6 @@
-const { FACILITIES, DISCOVERY_FILTER_DEFAULTS } = require('../constants');
+const { DISCOVERY_FILTER_DEFAULTS } = require('../constants');
 const { isOpenNow } = require('../utils');
+const { publicMaster } = require('./master');
 
 const mapToilet = (toilet, user, reviews) => ({
   ...toilet,
@@ -54,11 +55,11 @@ const listToilets = ({ db, user, search = '', filters = DISCOVERY_FILTER_DEFAULT
 };
 
 const discoveryFilters = db => {
-  const categories = [...new Set(db.toilets.map(item => item.category))].sort();
-  const availability = [...new Set(db.toilets.map(item => item.availability))].sort();
-  const facilities = FACILITIES.map(item => ({
-    name: item,
-    count: db.toilets.filter(toilet => toilet.facilities.includes(item)).length,
+  const master = publicMaster(db);
+  const facilities = master.facilities.map(item => ({
+    name: item.value,
+    label: item.label,
+    count: db.toilets.filter(toilet => (toilet.facilities || []).includes(item.value)).length,
   }));
   const maxPrice = Math.max(...db.toilets.map(item => item.basePrice), DISCOVERY_FILTER_DEFAULTS.maxPrice);
   const maxDistanceKm = Math.max(...db.toilets.map(item => item.distanceKm), DISCOVERY_FILTER_DEFAULTS.maxDistanceKm);
@@ -66,8 +67,8 @@ const discoveryFilters = db => {
   return {
     defaults: { ...DISCOVERY_FILTER_DEFAULTS, maxPrice, maxDistanceKm },
     options: {
-      categories,
-      availability,
+      categories: master.categories.map(item => ({ value: item.value, label: item.label })),
+      availability: master.availability.map(item => ({ value: item.value, label: item.label })),
       facilities,
       sortBy: [
         { label: 'Relevance', value: 'relevance' },

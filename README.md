@@ -46,6 +46,7 @@ Set `PNP_API_BASE_URL` in `pnp-mobile/constants/api.js`. Production/demo uses th
 | GET/PUT | `/api/profile` | yes | Profile / setup |
 | POST | `/api/home/feed` | yes | Home |
 | POST | `/api/toilets/search` | yes | Home, Search, Toilets, Favorites |
+| GET | `/api/master` | yes | Listing form options |
 | GET | `/api/toilets/filters` | yes | Discovery filters |
 | GET | `/api/toilets/mine` | yes | My toilets, Earnings, Profile |
 | GET | `/api/toilets/:id` | yes | Toilet details |
