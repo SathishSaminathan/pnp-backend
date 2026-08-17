@@ -9,6 +9,7 @@ API for the PNP mobile app. Seed data matches `pnp-mobile/services/pnpMockData.j
 ```bash
 cd pnp-backend
 cp .env.example .env
+docker compose up -d
 yarn
 yarn dev
 ```

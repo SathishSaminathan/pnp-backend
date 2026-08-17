@@ -49,8 +49,19 @@ const createApp = () => {
 </html>`);
   });
 
-  app.get('/health', (_req, res) => {
-    res.json({ ok: true, service: 'pnp-backend', message: 'Welcome to PNP. Backend is running.' });
+  app.get('/health', async (_req, res) => {
+    try {
+      const { ping, isReady } = require('./store/db');
+      const db = await ping();
+      res.json({
+        ok: true,
+        service: 'pnp-backend',
+        database: db && isReady() ? 'postgres' : 'down',
+        message: 'Welcome to PNP. Backend is running.',
+      });
+    } catch (error) {
+      res.status(503).json({ ok: false, service: 'pnp-backend', database: 'down', message: error.message });
+    }
   });
 
   app.use('/api/auth', authRoutes);

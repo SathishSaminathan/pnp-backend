@@ -1,6 +1,6 @@
 # PNP full setup
 
-This guide covers local development, Railway hosting (for real phones), and connecting `pnp-mobile`. Data is stored in `data/db.json`. **Postgres is not used** and is not required for a ~10 person demo.
+Data is stored in **Postgres**. Users live in a real `users` table (phone unique, block flags, profile). Other collections are synced into Postgres as well.
 
 Live API (current):
 
@@ -16,7 +16,7 @@ If Railway gives you a new domain, update this file and `pnp-mobile/constants/ap
 - Node.js 18+ (20 recommended)
 - Yarn
 - GitHub account
-- Railway account (Hobby plan if you want a persistent volume)
+- Railway account (Hobby is enough for Postgres)
 - Xcode and/or Android Studio for the mobile app
 
 ---
@@ -26,6 +26,7 @@ If Railway gives you a new domain, update this file and `pnp-mobile/constants/ap
 ```bash
 cd pnp-backend
 cp .env.example .env
+docker compose up -d
 yarn
 yarn dev
 ```
@@ -37,13 +38,14 @@ Health: `http://localhost:4000/health`
 
 ```
 PORT=4000
+DATABASE_URL=postgres://pnp:pnp@localhost:5432/pnp
 JWT_SECRET=change-this-pnp-jwt-secret
 JWT_EXPIRES_IN=7d
 REFRESH_EXPIRES_IN=30d
 DEV_OTP=123456
 ```
 
-On first run the API creates `data/db.json` from seed data.
+On first run the API creates tables and seeds users (or imports `data/db.json` if it exists).
 
 ### Demo login
 
@@ -130,6 +132,7 @@ Service → **Variables**:
 
 | Name | Value |
 | --- | --- |
+| `DATABASE_URL` | Variable reference from the Postgres service (see section 6) |
 | `JWT_SECRET` | Long random string (not the local default) |
 | `JWT_EXPIRES_IN` | `7d` |
 | `REFRESH_EXPIRES_IN` | `30d` |
@@ -149,34 +152,78 @@ Every `git push` to the connected branch redeploys.
 
 ---
 
-## 6. Persistent volume (keep testers’ data)
+## 6. Postgres on Railway
 
-Without a volume, `db.json` is wiped on deploy/restart.
+Tables live on the **Postgres** service, not on `pnp-backend`. The API only talks to Postgres through `DATABASE_URL`.
 
-Railway does **not** put this under Service → Settings. Use the **project canvas** (the page with service boxes):
+The canvas should have **exactly two** online services:
 
-1. Open the **project** (canvas), not only the service Variables tab.
-2. **Right-click empty space** → **Add Volume**, or press **⌘K** / **Ctrl+K** and type **Volume**.
-3. Attach it to the **pnp-backend** service.
-4. **Mount path:** `/app/data` (must start with `/`).
-5. Wait for the automatic redeploy to succeed.
+- **Postgres** (green / Online), with **postgres-volume** attached under it
+- **pnp-backend** (green / Online)
 
-Volumes usually need a **Hobby** (paid) workspace. Trial/free often hides **Add Volume**.
+Do **not** attach a volume to `pnp-backend`. That old `/app/data` disk was for `db.json` and is unused now.
 
-Confirm in logs that the API started, then hit `/health` again.
+### Add Postgres (if it is missing)
+
+1. Open the **project canvas** (the page with service boxes).
+2. Click empty space → **Create** / **Add** → **Database** → **PostgreSQL**.
+3. Wait until **Postgres** is **Online**. Railway creates `postgres-volume` on that service automatically. Leave it attached.
+
+### Where to get `DATABASE_URL`
+
+You get it from **Postgres**, not from `pnp-backend`. Do **not** use the local value `postgres://pnp:pnp@localhost:5432/pnp`.
+
+**Preferred (no password copy):**
+
+1. Click **Postgres** → **Variables**. Railway already has `DATABASE_URL` there.
+2. Click **pnp-backend** → **Variables** → **New variable**.
+3. Name: `DATABASE_URL`
+4. Value: **Add a variable reference** (shared / reference) → **Postgres** → **`DATABASE_URL`**.
+5. Railway stores it as `${{Postgres.DATABASE_URL}}`. That is correct.
+6. Save so `pnp-backend` redeploys.
+
+**To inspect the raw string only:** Postgres → **Variables** or **Connect**. It looks like `postgresql://postgres:PASSWORD@host:port/railway`. Paste that only if the variable reference UI is unavailable.
+
+After a successful deploy, `https://<your-api>.up.railway.app/health` should include `"database":"postgres"`.
+
+### Where to see table data
+
+1. Click the **Postgres** card (not `pnp-backend`).
+2. Open the **Data** tab.
+3. Click **`users`** to see every OTP account (phone, name, blocked, profile).
+4. Other tables: `toilets`, `bookings`, `reviews`, `notifications`, `transactions`, `master_data`.
+
+`pnp-backend` has Deployments / Variables / Settings only. It has **no** table browser.
+
+Optional SQL editor: enable **Raw SQL Query Tab** at [railway.com/account/feature-flags](https://railway.com/account/feature-flags), then run `SELECT * FROM users;`.
+
+Local laptop rows are a **different** database. Railway **Data** only shows Railway Postgres after the API has booted with `DATABASE_URL`.
+
+### Clean up extras (duplicate Postgres / leftover volumes)
+
+If the canvas has extra boxes:
+
+| Keep | Remove |
+| --- | --- |
+| **Postgres** (Online) + its nested **postgres-volume** | Extra Postgres cards (e.g. `Postgres-t7Lu`) |
+| **pnp-backend** | Disconnected **postgres-volume-…** from a deleted database |
+| | **pnp-backend-volume** (old JSON disk) |
+
+1. Wait until **Applying changes** finishes if a service already says **Removed**.
+2. Click each leftover volume → **Settings** or right-click → **Delete**.
+3. Confirm only **Postgres** + **pnp-backend** remain.
+4. **Do not** detach **postgres-volume** under the live **Postgres** service. That is the real database disk.
+
+To disconnect the old API volume: canvas → right-click **pnp-backend-volume** → **Disconnect**, then delete it. Redeploy `pnp-backend`.
 
 ---
 
 ## 7. Demo for ~10 users
 
-Postgres is **not** needed.
-
-1. Backend is live on Railway with a volume at `/app/data`.
+1. Backend is live on Railway with Postgres (`DATABASE_URL`).
 2. Mobile `PNP_API_BASE_URL` is the Railway `/api` URL.
 3. Testers install the app and log in with their phone number + OTP `123456`.
 4. Share the seeded number `9876543210` if you want a ready-made host listing.
-
-Add Postgres later only for a public launch, backups, or much more traffic. The API does not read `DATABASE_URL` today; adding a Postgres plugin on Railway does nothing until the code is migrated.
 
 ---
 
@@ -187,7 +234,9 @@ Add Postgres later only for a public launch, backups, or much more traffic. The 
 | Phone cannot log in | App still pointing at `localhost`. Set Railway URL and reload. |
 | First request is slow | Railway Hobby stays up; if you used a sleeping host, wait 30–60s and retry. |
 | `/health` fails | Open Railway **Deployments** and **Logs**. Confirm start command `yarn start`. |
-| Data vanished after deploy | Volume missing or mount path not `/app/data`. |
+| Data vanished after deploy | `DATABASE_URL` missing, pointing at localhost, or a brand-new empty Postgres. |
+| No **Data** / tables in the dashboard | You are on `pnp-backend`. Open the **Postgres** service → **Data**. |
+| `DATABASE_URL` unknown | Postgres → **Variables** → `DATABASE_URL`, then reference it on `pnp-backend` (section 6). |
 | OTP rejected | `DEV_OTP` on Railway must match what testers enter (`123456`). |
 | Build fails | Confirm repo root is `pnp-backend` (has `package.json`). |
 

@@ -1,0 +1,59 @@
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  phone VARCHAR(16) NOT NULL UNIQUE,
+  name TEXT NOT NULL DEFAULT '',
+  city TEXT NOT NULL DEFAULT '',
+  profile_completed BOOLEAN NOT NULL DEFAULT FALSE,
+  favorite_toilet_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+  blocked BOOLEAN NOT NULL DEFAULT FALSE,
+  blocked_at TIMESTAMPTZ,
+  blocked_reason TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_phone_idx ON users (phone);
+CREATE INDEX IF NOT EXISTS users_blocked_idx ON users (blocked);
+
+CREATE TABLE IF NOT EXISTS toilets (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS toilets_owner_idx ON toilets (owner_id);
+
+CREATE TABLE IF NOT EXISTS bookings (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  toilet_id TEXT,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id TEXT PRIMARY KEY,
+  toilet_id TEXT,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  data JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  data JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS master_data (
+  key TEXT PRIMARY KEY,
+  items JSONB NOT NULL DEFAULT '[]'::jsonb
+);

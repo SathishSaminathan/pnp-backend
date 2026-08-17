@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pnp-postgres
+    environment:
+      POSTGRES_USER: pnp
+      POSTGRES_PASSWORD: pnp
+      POSTGRES_DB: pnp
+    ports:
+      - '5432:5432'
+    volumes:
+      - pnp_pg:/var/lib/postgresql/data
+
+volumes:
+  pnp_pg:
