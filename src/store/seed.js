@@ -1,0 +1,230 @@
+const { FACILITIES, BOOKING_STATUS } = require('../constants');
+
+const createSeed = () => {
+  const users = [
+    {
+      id: 'user_001',
+      phone: '9876543210',
+      name: 'Priya Raman',
+      city: 'Chennai',
+      profileCompleted: true,
+      favoriteToiletIds: ['toilet_001', 'toilet_003'],
+    },
+    {
+      id: 'user_provider_002',
+      phone: '9000000002',
+      name: 'Marina Host',
+      city: 'Chennai',
+      profileCompleted: true,
+      favoriteToiletIds: [],
+    },
+    {
+      id: 'user_provider_003',
+      phone: '9000000003',
+      name: 'Tech Park Host',
+      city: 'Chennai',
+      profileCompleted: true,
+      favoriteToiletIds: [],
+    },
+  ];
+
+  const reviews = [
+    {
+      id: 'review_001',
+      toiletId: 'toilet_001',
+      bookingId: null,
+      userName: 'Arun K',
+      rating: 4.6,
+      cleanliness: 5,
+      safety: 4,
+      facilities: 5,
+      valueForMoney: 4,
+      comment: 'Clean, bright, and easy to access from the metro exit.',
+      createdAt: '2026-08-15T10:30:00.000Z',
+    },
+    {
+      id: 'review_002',
+      toiletId: 'toilet_002',
+      bookingId: null,
+      userName: 'Nisha P',
+      rating: 4.2,
+      cleanliness: 4,
+      safety: 4,
+      facilities: 4,
+      valueForMoney: 5,
+      comment: 'Affordable and available late into the night.',
+      createdAt: '2026-08-12T12:00:00.000Z',
+    },
+  ];
+
+  const toilets = [
+    {
+      id: 'toilet_001',
+      ownerId: 'user_001',
+      name: 'Central Metro Comfort Hub',
+      description: 'Premium pay-per-use restroom near the station entrance.',
+      category: 'Premium',
+      priceLabel: 'Per use',
+      basePrice: 20,
+      rating: 4.7,
+      reviewCount: 112,
+      distanceKm: 0.4,
+      verified: true,
+      availability: 'AVAILABLE',
+      operatingHours: '05:00 AM - 11:00 PM',
+      address: {
+        line1: 'Central Metro, Park Town',
+        area: 'Park Town',
+        city: 'Chennai',
+        state: 'Tamil Nadu',
+        country: 'India',
+        postalCode: '600003',
+      },
+      coordinates: { latitude: 13.0827, longitude: 80.2707 },
+      facilities: FACILITIES.slice(0, 8),
+      photos: [
+        'https://picsum.photos/seed/pnp-toilet-1a/800/500',
+        'https://picsum.photos/seed/pnp-toilet-1b/800/500',
+        'https://picsum.photos/seed/pnp-toilet-1c/800/500',
+        'https://picsum.photos/seed/pnp-toilet-1d/800/500',
+      ],
+    },
+    {
+      id: 'toilet_002',
+      ownerId: 'user_provider_002',
+      name: 'Marina Seaside Wash Point',
+      description: 'Family-friendly facility close to the promenade.',
+      category: 'Public Partner',
+      priceLabel: 'Per use',
+      basePrice: 30,
+      rating: 4.3,
+      reviewCount: 74,
+      distanceKm: 1.8,
+      verified: true,
+      availability: 'TEMPORARILY_HELD',
+      operatingHours: '06:00 AM - 10:00 PM',
+      address: {
+        line1: 'Marina Beach Service Lane',
+        area: 'Triplicane',
+        city: 'Chennai',
+        state: 'Tamil Nadu',
+        country: 'India',
+        postalCode: '600005',
+      },
+      coordinates: { latitude: 13.05, longitude: 80.2824 },
+      facilities: FACILITIES.slice(2, 12),
+      photos: [
+        'https://picsum.photos/seed/pnp-toilet-2a/800/500',
+        'https://picsum.photos/seed/pnp-toilet-2b/800/500',
+        'https://picsum.photos/seed/pnp-toilet-2c/800/500',
+      ],
+    },
+    {
+      id: 'toilet_003',
+      ownerId: 'user_provider_003',
+      name: 'Tech Park Hygiene Station',
+      description: 'Fast access for office commuters and cab drivers.',
+      category: 'Corporate',
+      priceLabel: 'Per use',
+      basePrice: 15,
+      rating: 4.5,
+      reviewCount: 55,
+      distanceKm: 3.2,
+      verified: false,
+      availability: 'AVAILABLE',
+      operatingHours: '24 Hours',
+      address: {
+        line1: 'OMR Tech Corridor',
+        area: 'Perungudi',
+        city: 'Chennai',
+        state: 'Tamil Nadu',
+        country: 'India',
+        postalCode: '600096',
+      },
+      coordinates: { latitude: 12.96, longitude: 80.246 },
+      facilities: FACILITIES.slice(4),
+      photos: [
+        'https://picsum.photos/seed/pnp-toilet-3a/800/500',
+        'https://picsum.photos/seed/pnp-toilet-3b/800/500',
+        'https://picsum.photos/seed/pnp-toilet-3c/800/500',
+      ],
+    },
+  ];
+
+  const bookings = [
+    {
+      id: 'booking_001',
+      toiletId: 'toilet_001',
+      userId: 'user_001',
+      toiletName: 'Central Metro Comfort Hub',
+      date: '2026-08-19',
+      time: '09:30 AM',
+      duration: 'Per use',
+      amount: 35,
+      paymentStatus: 'PAID',
+      bookingStatus: BOOKING_STATUS.UPCOMING,
+      reviewSubmitted: false,
+    },
+    {
+      id: 'booking_002',
+      toiletId: 'toilet_002',
+      userId: 'user_001',
+      toiletName: 'Marina Seaside Wash Point',
+      date: '2026-08-16',
+      time: '07:30 PM',
+      duration: 'Per use',
+      amount: 20,
+      paymentStatus: 'PAID',
+      bookingStatus: BOOKING_STATUS.COMPLETED,
+      reviewSubmitted: false,
+    },
+  ];
+
+  const notifications = [
+    {
+      id: 'notification_001',
+      userId: 'user_001',
+      title: 'Booking confirmed',
+      body: 'Your Central Metro Comfort Hub slot for 19 Aug is confirmed.',
+      audience: 'customer',
+      createdAt: '2026-08-17T09:00:00.000Z',
+    },
+    {
+      id: 'notification_002',
+      userId: 'user_001',
+      title: 'New booking received',
+      body: 'A customer booked Central Metro Comfort Hub for 19 Aug, 09:30 AM.',
+      audience: 'provider',
+      createdAt: '2026-08-17T09:03:00.000Z',
+    },
+  ];
+
+  const transactions = [
+    {
+      id: 'txn_001',
+      ownerId: 'user_001',
+      bookingId: 'booking_001',
+      toiletName: 'Central Metro Comfort Hub',
+      grossAmount: 35,
+      platformFee: 5,
+      taxAmount: 2,
+      netAmount: 28,
+      settlementStatus: 'SETTLED',
+    },
+    {
+      id: 'txn_002',
+      ownerId: 'user_provider_002',
+      bookingId: 'booking_002',
+      toiletName: 'Marina Seaside Wash Point',
+      grossAmount: 20,
+      platformFee: 4,
+      taxAmount: 1,
+      netAmount: 15,
+      settlementStatus: 'PENDING',
+    },
+  ];
+
+  return { users, toilets, bookings, reviews, notifications, transactions };
+};
+
+module.exports = { createSeed };
