@@ -2,7 +2,9 @@
 
 API for the PNP mobile app. Seed data matches `pnp-mobile/services/pnpMockData.js`.
 
-## Setup
+**Full local + Railway + mobile setup:** [SETUP.md](./SETUP.md)
+
+## Quick start (local)
 
 ```bash
 cd pnp-backend
@@ -11,7 +13,7 @@ yarn
 yarn dev
 ```
 
-The server listens on `http://localhost:4000`.
+The server listens on `http://localhost:4000`. For real devices, host on Railway and point the app at the HTTPS `/api` URL (see SETUP.md).
 
 ## OTP login
 
@@ -25,12 +27,7 @@ Default seeded user: **9876543210** (Priya Raman, profile complete, owns Central
 
 ## Mobile app
 
-`pnp-mobile` points at:
-
-- iOS simulator: `http://localhost:4000/api`
-- Android emulator: `http://10.0.2.2:4000/api`
-
-On a physical device, set `PNP_API_BASE_URL` in `pnp-mobile/constants/api.js` to your machine LAN IP.
+Set `PNP_API_BASE_URL` in `pnp-mobile/constants/api.js`. Production/demo uses the Railway URL. Simulator/emulator options are in [SETUP.md](./SETUP.md).
 
 ## Endpoints
 
