@@ -62,7 +62,7 @@ OTP for all numbers: **`123456`**
 | --- | --- |
 | `admin@pnp.app` | `Admin@123` |
 
-Set the same values in `.env` as `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Run `pnp-web-admin` with `yarn dev` (proxies `/api` to `http://localhost:4000`).
+Set the same values in `.env` as `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Run `pnp-web-admin` with `yarn dev`. It calls the same Railway API as the mobile app (`https://pnp-backend-production-623c.up.railway.app/api`). To use a local API instead, set `VITE_API_BASE_URL=http://localhost:4000/api` in `pnp-web-admin/.env.local`.
 
 1. `POST /api/auth/otp` with `{ "phone": "9876543210" }`
 2. `POST /api/auth/otp/verify` with `{ "phone", "otp": "123456", "requestId" }`
