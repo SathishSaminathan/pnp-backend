@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { HttpError } = require('../utils');
+const { HttpError, isBlocked } = require('../utils');
 const { readDb } = require('../store/db');
 
 const signAccessToken = user =>
@@ -47,6 +47,9 @@ const requireAuth = (req, _res, next) => {
     const user = db.users.find(item => item.id === payload.sub);
     if (!user) {
       return next(new HttpError(401, 'Invalid session'));
+    }
+    if (isBlocked(user)) {
+      return next(new HttpError(403, 'This account has been blocked. Contact support.'));
     }
     req.user = user;
     return next();

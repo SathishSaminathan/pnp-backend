@@ -67,7 +67,36 @@ router.get('/users/:userId', (req, res, next) => {
       ...enrichUser(user, db),
       bookings: db.bookings.filter(item => item.userId === user.id),
       favorites: db.toilets.filter(item => (user.favoriteToiletIds || []).includes(item.id)),
+      toilets: db.toilets.filter(item => item.ownerId === user.id),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch('/users/:userId/block', (req, res, next) => {
+  try {
+    const blocked = Boolean(req.body?.blocked);
+    const reason = String(req.body?.reason || '').trim();
+    let saved;
+
+    updateDb(db => {
+      const user = db.users.find(item => item.id === req.params.userId);
+      if (!user) throw new HttpError(404, 'User not found');
+      db.users = db.users.map(item => {
+        if (item.id !== req.params.userId) return item;
+        saved = {
+          ...item,
+          blocked,
+          blockedAt: blocked ? new Date().toISOString() : null,
+          blockedReason: blocked ? reason : '',
+        };
+        return saved;
+      });
+      return db;
+    });
+
+    res.json(enrichUser(saved, readDb()));
   } catch (error) {
     next(error);
   }
@@ -87,13 +116,33 @@ router.get('/owners', (req, res) => {
   res.json({ items, total: items.length });
 });
 
-router.get('/listings', (_req, res) => {
+router.get('/listings', (req, res) => {
   const db = readDb();
-  const items = db.toilets.map(toilet => ({
-    ...toilet,
-    owner: publicUser(db.users.find(user => user.id === toilet.ownerId) || { id: toilet.ownerId, phone: '', name: 'Unknown', city: '', profileCompleted: false, favoriteToiletIds: [] }),
-    bookingCount: db.bookings.filter(item => item.toiletId === toilet.id).length,
-  }));
+  const ownerId = req.query.ownerId;
+  const search = String(req.query.search || '').trim().toLowerCase();
+  const items = db.toilets
+    .filter(item => (!ownerId ? true : item.ownerId === ownerId))
+    .map(toilet => {
+      const owner = db.users.find(user => user.id === toilet.ownerId) || {
+        id: toilet.ownerId,
+        phone: '',
+        name: 'Unknown',
+        city: '',
+        profileCompleted: false,
+        favoriteToiletIds: [],
+      };
+      return {
+        ...toilet,
+        owner: publicUser(owner),
+        ownerBlocked: Boolean(owner.blocked),
+        bookingCount: db.bookings.filter(item => item.toiletId === toilet.id).length,
+      };
+    })
+    .filter(item => {
+      if (!search) return true;
+      return [item.name, item.owner?.name, item.owner?.phone, item.address?.city, item.address?.area]
+        .some(value => String(value || '').toLowerCase().includes(search));
+    });
   res.json({ items, total: items.length });
 });
 

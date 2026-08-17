@@ -1,7 +1,7 @@
 const express = require('express');
 const { sendOtp, consumeOtp } = require('../services/otp');
 const { readDb, updateDb, nextId } = require('../store/db');
-const { publicUser } = require('../utils');
+const { publicUser, normalizePhone, assertNotBlocked } = require('../utils');
 const { signAccessToken, signRefreshToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -9,6 +9,9 @@ const router = express.Router();
 router.post('/otp', (req, res, next) => {
   try {
     const phone = req.body?.phone ?? req.body;
+    const normalized = normalizePhone(phone);
+    const existing = readDb().users.find(item => item.phone === normalized);
+    assertNotBlocked(existing);
     res.json(sendOtp(phone));
   } catch (error) {
     next(error);
@@ -23,6 +26,10 @@ router.post('/otp/verify', (req, res, next) => {
     let user = db.users.find(item => item.phone === normalizedPhone);
     const isNewUser = !user;
 
+    if (user) {
+      assertNotBlocked(user);
+    }
+
     if (!user) {
       user = {
         id: nextId('user'),
@@ -31,6 +38,7 @@ router.post('/otp/verify', (req, res, next) => {
         city: '',
         profileCompleted: false,
         favoriteToiletIds: [],
+        blocked: false,
       };
       updateDb(current => {
         current.users.push(user);

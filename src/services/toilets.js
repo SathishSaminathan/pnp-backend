@@ -1,5 +1,5 @@
 const { DISCOVERY_FILTER_DEFAULTS } = require('../constants');
-const { isOpenNow } = require('../utils');
+const { isBlocked, isOpenNow } = require('../utils');
 const { publicMaster } = require('./master');
 
 const mapToilet = (toilet, user, reviews) => ({
@@ -19,7 +19,12 @@ const normalizeFilters = filters => ({
 const listToilets = ({ db, user, search = '', filters = DISCOVERY_FILTER_DEFAULTS, sortBy = 'relevance' }) => {
   const query = String(search || '').trim().toLowerCase();
   const normalizedFilters = normalizeFilters(filters);
-  const mappedToilets = db.toilets.map(toilet => mapToilet(toilet, user, db.reviews));
+  const mappedToilets = db.toilets
+    .filter(toilet => {
+      const owner = db.users.find(item => item.id === toilet.ownerId);
+      return !isBlocked(owner);
+    })
+    .map(toilet => mapToilet(toilet, user, db.reviews));
 
   return mappedToilets
     .filter(toilet => {

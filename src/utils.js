@@ -14,7 +14,18 @@ const publicUser = user => ({
   city: user.city,
   profileCompleted: Boolean(user.profileCompleted),
   favoriteToiletIds: user.favoriteToiletIds || [],
+  blocked: Boolean(user.blocked),
+  blockedAt: user.blockedAt || null,
+  blockedReason: user.blockedReason || '',
 });
+
+const isBlocked = user => Boolean(user?.blocked);
+
+const assertNotBlocked = user => {
+  if (isBlocked(user)) {
+    throw new HttpError(403, 'This account has been blocked. Contact support.');
+  }
+};
 
 const parseTimeToken = token => {
   const [hourPart, minutePartAndPeriod] = String(token || '').trim().split(':');
@@ -49,5 +60,7 @@ module.exports = {
   HttpError,
   normalizePhone,
   publicUser,
+  isBlocked,
+  assertNotBlocked,
   isOpenNow,
 };

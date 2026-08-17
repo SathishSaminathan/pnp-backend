@@ -22,7 +22,18 @@ const enrichOwner = (user, db) => {
   const txns = db.transactions.filter(item => item.ownerId === user.id);
   return {
     ...enrichUser(user, db),
-    listings: toilets.map(item => ({ id: item.id, name: item.name, verified: item.verified, availability: item.availability })),
+    listings: toilets.map(item => ({
+      id: item.id,
+      name: item.name,
+      verified: item.verified,
+      availability: item.availability,
+      basePrice: item.basePrice,
+      rating: item.rating,
+      reviewCount: item.reviewCount,
+      city: item.address?.city,
+      area: item.address?.area,
+      address: item.address,
+    })),
     hostBookingCount: bookings.length,
     settledAmount: txns.filter(item => item.settlementStatus === 'SETTLED').reduce((sum, item) => sum + Number(item.netAmount || 0), 0),
     pendingAmount: txns.filter(item => item.settlementStatus !== 'SETTLED').reduce((sum, item) => sum + Number(item.netAmount || 0), 0),
