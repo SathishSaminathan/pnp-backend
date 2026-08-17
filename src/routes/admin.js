@@ -1,0 +1,134 @@
+const express = require('express');
+const config = require('../config');
+const { HttpError, publicUser } = require('../utils');
+const { readDb } = require('../store/db');
+const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../middleware/auth');
+const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
+
+const router = express.Router();
+
+router.post('/login', (req, res, next) => {
+  try {
+    const email = String(req.body?.email || req.body?.username || '').toLowerCase().trim();
+    const password = String(req.body?.password || '');
+
+    if (!email || !password) {
+      throw new HttpError(400, 'Email and password are required');
+    }
+    if (!safeEqual(email, config.adminEmail) || !safeEqual(password, config.adminPassword)) {
+      throw new HttpError(400, 'Invalid credentials');
+    }
+
+    const admin = adminProfile();
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        token: signAdminToken(admin),
+        userData: admin,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.use(requireAdmin);
+
+router.get('/me', (req, res) => {
+  res.json({ success: true, data: { data: req.admin } });
+});
+
+router.get('/overview', (_req, res) => {
+  res.json(overview(readDb()));
+});
+
+router.get('/users', (req, res) => {
+  const db = readDb();
+  const search = String(req.query.search || '').trim().toLowerCase();
+  const items = db.users
+    .map(user => enrichUser(user, db))
+    .filter(user => {
+      if (!search) return true;
+      return [user.name, user.phone, user.city, user.role].some(value =>
+        String(value || '').toLowerCase().includes(search),
+      );
+    });
+  res.json({ items, total: items.length });
+});
+
+router.get('/users/:userId', (req, res, next) => {
+  try {
+    const db = readDb();
+    const user = db.users.find(item => item.id === req.params.userId);
+    if (!user) throw new HttpError(404, 'User not found');
+    res.json({
+      ...enrichUser(user, db),
+      bookings: db.bookings.filter(item => item.userId === user.id),
+      favorites: db.toilets.filter(item => (user.favoriteToiletIds || []).includes(item.id)),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/owners', (req, res) => {
+  const db = readDb();
+  const ids = ownerIds(db);
+  const search = String(req.query.search || '').trim().toLowerCase();
+  const items = db.users
+    .filter(user => ids.has(user.id))
+    .map(user => enrichOwner(user, db))
+    .filter(user => {
+      if (!search) return true;
+      return [user.name, user.phone, user.city].some(value => String(value || '').toLowerCase().includes(search));
+    });
+  res.json({ items, total: items.length });
+});
+
+router.get('/listings', (_req, res) => {
+  const db = readDb();
+  const items = db.toilets.map(toilet => ({
+    ...toilet,
+    owner: publicUser(db.users.find(user => user.id === toilet.ownerId) || { id: toilet.ownerId, phone: '', name: 'Unknown', city: '', profileCompleted: false, favoriteToiletIds: [] }),
+    bookingCount: db.bookings.filter(item => item.toiletId === toilet.id).length,
+  }));
+  res.json({ items, total: items.length });
+});
+
+router.get('/bookings', (req, res) => {
+  const db = readDb();
+  const status = req.query.status;
+  const items = db.bookings
+    .filter(item => (!status ? true : item.bookingStatus === status))
+    .map(booking => ({
+      ...booking,
+      user: publicUser(db.users.find(user => user.id === booking.userId) || { id: booking.userId, phone: '', name: 'Unknown', city: '', profileCompleted: false, favoriteToiletIds: [] }),
+    }));
+  res.json({ items, total: items.length });
+});
+
+router.get('/earnings', (_req, res) => {
+  const db = readDb();
+  res.json(overview(db).earnings);
+});
+
+router.get('/transactions', (_req, res) => {
+  const db = readDb();
+  const items = db.transactions.map(txn => ({
+    ...txn,
+    owner: publicUser(db.users.find(user => user.id === txn.ownerId) || { id: txn.ownerId, phone: '', name: 'Unknown', city: '', profileCompleted: false, favoriteToiletIds: [] }),
+  }));
+  res.json({ items, total: items.length });
+});
+
+router.get('/reviews', (_req, res) => {
+  const db = readDb();
+  const items = db.reviews.map(review => ({
+    ...review,
+    toiletName: db.toilets.find(item => item.id === review.toiletId)?.name || '',
+  }));
+  res.json({ items, total: items.length });
+});
+
+module.exports = router;

@@ -13,6 +13,7 @@ const paymentRoutes = require('./routes/payments');
 const earningsRoutes = require('./routes/earnings');
 const reviewRoutes = require('./routes/reviews');
 const notificationRoutes = require('./routes/notifications');
+const adminRoutes = require('./routes/admin');
 
 const createApp = () => {
   const app = express();
@@ -40,6 +41,7 @@ const createApp = () => {
       <h1>Welcome to PNP</h1>
       <p>Backend is running. Use this page to confirm the API is up.</p>
       <p>OTP login is ready. Demo code: <code>123456</code></p>
+      <p>Admin: <code>admin@pnp.app</code> / <code>Admin@123</code></p>
       <p>Health: <code>/health</code> · API: <code>/api</code></p>
     </main>
   </body>
@@ -51,6 +53,7 @@ const createApp = () => {
   });
 
   app.use('/api/auth', authRoutes);
+  app.use('/api/admin', adminRoutes);
   app.use('/api/profile', requireAuth, profileRoutes);
   app.use('/api/home', requireAuth, homeRoutes);
   app.use('/api/toilets', requireAuth, toiletRoutes);

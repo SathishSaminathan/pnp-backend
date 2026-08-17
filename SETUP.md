@@ -54,6 +54,14 @@ On first run the API creates `data/db.json` from seed data.
 
 OTP for all numbers: **`123456`**
 
+### Admin (web)
+
+| Email | Password |
+| --- | --- |
+| `admin@pnp.app` | `Admin@123` |
+
+Set the same values in `.env` as `ADMIN_EMAIL` / `ADMIN_PASSWORD`. Run `pnp-web-admin` with `yarn dev` (proxies `/api` to `http://localhost:4000`).
+
 1. `POST /api/auth/otp` with `{ "phone": "9876543210" }`
 2. `POST /api/auth/otp/verify` with `{ "phone", "otp": "123456", "requestId" }`
 

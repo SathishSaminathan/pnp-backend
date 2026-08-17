@@ -7,4 +7,6 @@ module.exports = {
   refreshExpiresIn: process.env.REFRESH_EXPIRES_IN || '30d',
   devOtp: String(process.env.DEV_OTP || '123456'),
   platformFee: 5,
+  adminEmail: String(process.env.ADMIN_EMAIL || 'admin@pnp.app').toLowerCase().trim(),
+  adminPassword: String(process.env.ADMIN_PASSWORD || 'Admin@123'),
 };

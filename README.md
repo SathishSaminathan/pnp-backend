@@ -25,6 +25,14 @@ Numbers ending in `0000` create a new user and skip profile completion until `PU
 
 Default seeded user: **9876543210** (Priya Raman, profile complete, owns Central Metro Comfort Hub).
 
+## Admin login (pnp-web-admin)
+
+| Email | Password |
+| --- | --- |
+| `admin@pnp.app` | `Admin@123` |
+
+`POST /api/admin/login` with `{ "email", "password" }`. Then call `/api/admin/overview`, `/users`, `/owners`, `/bookings`, `/earnings`, `/transactions` with `Authorization: Bearer <token>`.
+
 ## Mobile app
 
 Set `PNP_API_BASE_URL` in `pnp-mobile/constants/api.js`. Production/demo uses the Railway URL. Simulator/emulator options are in [SETUP.md](./SETUP.md).
