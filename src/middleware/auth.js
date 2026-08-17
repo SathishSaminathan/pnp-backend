@@ -49,7 +49,11 @@ const requireAuth = (req, _res, next) => {
       return next(new HttpError(401, 'Invalid session'));
     }
     if (isBlocked(user)) {
-      return next(new HttpError(403, 'This account has been blocked. Contact support.'));
+      const path = String(req.originalUrl || req.path || '').split('?')[0];
+      const allowBlockedProfile = req.method === 'GET' && /\/api\/profile\/?$/.test(path);
+      if (!allowBlockedProfile) {
+        return next(new HttpError(403, 'This account has been blocked. Contact support.', { code: 'ACCOUNT_BLOCKED' }));
+      }
     }
     req.user = user;
     return next();

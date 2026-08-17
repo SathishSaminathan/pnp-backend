@@ -1,7 +1,8 @@
 class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, extra = {}) {
     super(message);
     this.status = status;
+    this.code = extra.code;
   }
 }
 
@@ -23,7 +24,7 @@ const isBlocked = user => Boolean(user?.blocked);
 
 const assertNotBlocked = user => {
   if (isBlocked(user)) {
-    throw new HttpError(403, 'This account has been blocked. Contact support.');
+    throw new HttpError(403, 'This account has been blocked. Contact support.', { code: 'ACCOUNT_BLOCKED' });
   }
 };
 
