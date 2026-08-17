@@ -57,6 +57,65 @@ const isOpenNow = operatingHours => {
   return nowMinutes >= start || nowMinutes <= end;
 };
 
+const toRad = degrees => (Number(degrees) * Math.PI) / 180;
+
+const parseCoord = value => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const parseOrigin = value => {
+  if (!value || typeof value !== 'object') return null;
+  const latitude = parseCoord(value.latitude ?? value.lat);
+  const longitude = parseCoord(value.longitude ?? value.lng);
+  if (latitude == null || longitude == null) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  return { latitude, longitude };
+};
+
+const parseBounds = (bounds, fallback = {}) => {
+  const source = bounds && typeof bounds === 'object' ? bounds : fallback;
+  const minLat = parseCoord(source.minLat ?? source.min_lat);
+  const maxLat = parseCoord(source.maxLat ?? source.max_lat);
+  const minLng = parseCoord(source.minLng ?? source.min_lng);
+  const maxLng = parseCoord(source.maxLng ?? source.max_lng);
+  if ([minLat, maxLat, minLng, maxLng].some(item => item == null)) return null;
+  if (Math.abs(minLat) > 90 || Math.abs(maxLat) > 90 || Math.abs(minLng) > 180 || Math.abs(maxLng) > 180) return null;
+  return {
+    minLat: Math.min(minLat, maxLat),
+    maxLat: Math.max(minLat, maxLat),
+    minLng: Math.min(minLng, maxLng),
+    maxLng: Math.max(minLng, maxLng),
+  };
+};
+
+const haversineKm = (from, to) => {
+  const origin = parseOrigin(from);
+  const point = parseOrigin(to);
+  if (!origin || !point) return null;
+  const earthKm = 6371;
+  const dLat = toRad(point.latitude - origin.latitude);
+  const dLng = toRad(point.longitude - origin.longitude);
+  const lat1 = toRad(origin.latitude);
+  const lat2 = toRad(point.latitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return earthKm * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+};
+
+const isInBounds = (coordinates, bounds) => {
+  const point = parseOrigin(coordinates);
+  const box = parseBounds(bounds);
+  if (!point || !box) return false;
+  return (
+    point.latitude >= box.minLat &&
+    point.latitude <= box.maxLat &&
+    point.longitude >= box.minLng &&
+    point.longitude <= box.maxLng
+  );
+};
+
+const roundKm = km => Math.round(Number(km) * 10) / 10;
+
 module.exports = {
   HttpError,
   normalizePhone,
@@ -64,4 +123,9 @@ module.exports = {
   isBlocked,
   assertNotBlocked,
   isOpenNow,
+  parseOrigin,
+  parseBounds,
+  haversineKm,
+  isInBounds,
+  roundKm,
 };

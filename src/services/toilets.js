@@ -1,13 +1,17 @@
 const { DISCOVERY_FILTER_DEFAULTS } = require('../constants');
-const { isBlocked, isOpenNow } = require('../utils');
+const { isBlocked, isOpenNow, parseBounds, parseOrigin, haversineKm, isInBounds, roundKm } = require('../utils');
 const { publicMaster } = require('./master');
 const { isFavorite } = require('./favorites');
 
-const mapToilet = (toilet, user, reviews) => ({
-  ...toilet,
-  isFavorite: isFavorite(user, toilet.id),
-  reviews: (reviews || []).filter(review => review.toiletId === toilet.id),
-});
+const mapToilet = (toilet, user, reviews, origin) => {
+  const computedKm = haversineKm(origin, toilet.coordinates);
+  return {
+    ...toilet,
+    isFavorite: isFavorite(user, toilet.id),
+    distanceKm: computedKm == null ? Number(toilet.distanceKm || 0) : roundKm(computedKm),
+    reviews: (reviews || []).filter(review => review.toiletId === toilet.id),
+  };
+};
 
 const normalizeFilters = filters => ({
   ...DISCOVERY_FILTER_DEFAULTS,
@@ -17,15 +21,37 @@ const normalizeFilters = filters => ({
   facilities: Array.isArray(filters?.facilities) ? filters.facilities : [],
 });
 
-const listToilets = ({ db, user, search = '', filters = DISCOVERY_FILTER_DEFAULTS, sortBy = 'relevance' }) => {
+const listToilets = ({
+  db,
+  user,
+  search = '',
+  filters = DISCOVERY_FILTER_DEFAULTS,
+  sortBy = 'relevance',
+  bounds,
+  origin,
+  minLat,
+  maxLat,
+  minLng,
+  maxLng,
+} = {}) => {
   const query = String(search || '').trim().toLowerCase();
   const normalizedFilters = normalizeFilters(filters);
+  const normalizedOrigin = parseOrigin(origin);
+  const hasBoundsPayload = Boolean(
+    (bounds && typeof bounds === 'object') ||
+      [minLat, maxLat, minLng, maxLng].some(value => value != null && value !== ''),
+  );
+  const normalizedBounds = parseBounds(bounds, { minLat, maxLat, minLng, maxLng });
+  if (hasBoundsPayload && !normalizedBounds) return [];
+
   const mappedToilets = db.toilets
     .filter(toilet => {
       const owner = db.users.find(item => item.id === toilet.ownerId);
-      return !isBlocked(owner);
+      if (isBlocked(owner)) return false;
+      if (normalizedBounds && !isInBounds(toilet.coordinates, normalizedBounds)) return false;
+      return true;
     })
-    .map(toilet => mapToilet(toilet, user, db.reviews));
+    .map(toilet => mapToilet(toilet, user, db.reviews, normalizedOrigin));
 
   return mappedToilets
     .filter(toilet => {
@@ -41,7 +67,9 @@ const listToilets = ({ db, user, search = '', filters = DISCOVERY_FILTER_DEFAULT
       if (normalizedFilters.verifiedOnly && !toilet.verified) return false;
       if (toilet.basePrice > Number(normalizedFilters.maxPrice || DISCOVERY_FILTER_DEFAULTS.maxPrice)) return false;
       if (toilet.rating < Number(normalizedFilters.minRating || 0)) return false;
-      if (toilet.distanceKm > Number(normalizedFilters.maxDistanceKm || DISCOVERY_FILTER_DEFAULTS.maxDistanceKm)) return false;
+      if (!normalizedBounds && toilet.distanceKm > Number(normalizedFilters.maxDistanceKm || DISCOVERY_FILTER_DEFAULTS.maxDistanceKm)) {
+        return false;
+      }
       if (normalizedFilters.availability.length && !normalizedFilters.availability.includes(toilet.availability)) return false;
       if (normalizedFilters.categories.length && !normalizedFilters.categories.includes(toilet.category)) return false;
       if (normalizedFilters.facilities.length && !normalizedFilters.facilities.every(item => toilet.facilities.includes(item))) {
@@ -54,6 +82,7 @@ const listToilets = ({ db, user, search = '', filters = DISCOVERY_FILTER_DEFAULT
       if (sortBy === 'price_low') return a.basePrice - b.basePrice;
       if (sortBy === 'price_high') return b.basePrice - a.basePrice;
       if (sortBy === 'rating') return b.rating - a.rating;
+      if (normalizedOrigin && a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
       if (a.verified !== b.verified) return a.verified ? -1 : 1;
       return a.distanceKm - b.distanceKm;
