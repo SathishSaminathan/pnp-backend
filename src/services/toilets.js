@@ -5,15 +5,25 @@ const { isFavorite } = require('./favorites');
 
 const isToiletEnabled = toilet => toilet?.enabled !== false;
 
-const mapToilet = (toilet, user, reviews, origin) => {
+const mapEnabledStatus = (toilet, enabled = isToiletEnabled(toilet)) => ({
+  id: toilet.id,
+  enabled,
+  message: enabled ? 'Listing is now visible on the map' : 'Listing is hidden from the map',
+});
+
+const mapToilet = (toilet, user, reviews, origin, options = {}) => {
   const computedKm = haversineKm(origin, toilet.coordinates);
-  return {
+  const mapped = {
     ...toilet,
     enabled: isToiletEnabled(toilet),
+    isOwner: Boolean(user?.id && toilet.ownerId === user.id),
     isFavorite: isFavorite(user, toilet.id),
     distanceKm: computedKm == null ? Number(toilet.distanceKm || 0) : roundKm(computedKm),
-    reviews: (reviews || []).filter(review => review.toiletId === toilet.id),
   };
+  if (options.includeReviews) {
+    mapped.reviews = (reviews || []).filter(review => review.toiletId === toilet.id);
+  }
+  return mapped;
 };
 
 const normalizeFilters = filters => ({
@@ -55,7 +65,7 @@ const listToilets = ({
       if (normalizedBounds && !isInBounds(toilet.coordinates, normalizedBounds)) return false;
       return true;
     })
-    .map(toilet => mapToilet(toilet, user, db.reviews, normalizedOrigin));
+    .map(toilet => mapToilet(toilet, user, undefined, normalizedOrigin));
 
   return mappedToilets
     .filter(toilet => {
@@ -126,4 +136,4 @@ const discoveryFilters = db => {
   };
 };
 
-module.exports = { isToiletEnabled, mapToilet, listToilets, discoveryFilters };
+module.exports = { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters };

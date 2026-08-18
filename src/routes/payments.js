@@ -15,6 +15,9 @@ router.post('/quote', (req, res, next) => {
     if (!toilet) {
       throw new HttpError(404, 'Toilet not found');
     }
+    if (toilet.ownerId === req.user.id) {
+      throw new HttpError(400, 'You cannot book your own listing.');
+    }
     if (toilet.enabled === false) {
       throw new HttpError(400, 'This restroom is currently disabled.');
     }
@@ -74,6 +77,9 @@ router.post('/verify', (req, res, next) => {
     const toilet = db.toilets.find(item => item.id === quote.toiletId);
     if (!toilet) {
       throw new HttpError(404, 'Toilet not found');
+    }
+    if (toilet.ownerId === req.user.id) {
+      throw new HttpError(400, 'You cannot book your own listing.');
     }
     if (toilet.enabled === false) {
       throw new HttpError(400, 'This restroom is currently disabled.');

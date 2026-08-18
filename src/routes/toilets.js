@@ -1,7 +1,7 @@
 const express = require('express');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
-const { isToiletEnabled, mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
+const { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
 const { facilityValues } = require('../services/master');
 const { listFavoriteToilets, toggleFavorite } = require('../services/favorites');
 
@@ -49,21 +49,20 @@ router.patch('/:toiletId/enabled', (req, res, next) => {
     if (typeof req.body?.enabled !== 'boolean') {
       throw new HttpError(400, 'enabled must be a boolean');
     }
-    let mapped;
+    const enabled = req.body.enabled;
+    let result;
 
     updateDb(db => {
       const toilet = getToiletOrThrow(db, toiletId);
       if (toilet.ownerId !== req.user.id) {
         throw new HttpError(403, 'You can only update your own listings');
       }
-      db.toilets = db.toilets.map(item =>
-        item.id === toiletId ? { ...item, enabled: req.body.enabled } : item,
-      );
-      mapped = mapToilet(db.toilets.find(item => item.id === toiletId), req.user, db.reviews);
+      db.toilets = db.toilets.map(item => (item.id === toiletId ? { ...item, enabled } : item));
+      result = mapEnabledStatus(db.toilets.find(item => item.id === toiletId), enabled);
       return db;
     });
 
-    res.json(mapped);
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -76,7 +75,7 @@ router.get('/:toiletId', (req, res, next) => {
     if (!isToiletEnabled(toilet) && toilet.ownerId !== req.user.id) {
       throw new HttpError(404, 'Toilet not found');
     }
-    res.json(mapToilet(toilet, req.user, db.reviews));
+    res.json(mapToilet(toilet, req.user, db.reviews, undefined, { includeReviews: true }));
   } catch (error) {
     next(error);
   }
