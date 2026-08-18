@@ -1,6 +1,7 @@
 const { publicUser } = require('../utils');
 const { publicTransaction } = require('./payments');
 const { summarizeTransactions } = require('./earnings');
+const { rewritePhotoList } = require('./uploads');
 
 const ownerIds = db => new Set(db.toilets.map(item => item.ownerId));
 
@@ -36,7 +37,7 @@ const enrichOwner = (user, db) => {
       city: item.address?.city,
       area: item.address?.area,
       address: item.address,
-      photos: item.photos || [],
+      photos: rewritePhotoList(item.photos),
     })),
     hostBookingCount: bookings.length,
     settledAmount: txns.filter(item => item.settlementStatus === 'SETTLED').reduce((sum, item) => sum + Number(item.netAmount || 0), 0),

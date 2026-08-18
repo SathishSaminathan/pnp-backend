@@ -10,20 +10,16 @@ const JPEG_QUALITY = 80;
 
 let s3Client = null;
 
-const publicBaseUrl = () => String(config.s3PublicBaseUrl || '').replace(/\/$/, '');
+const publicBaseUrl = () => {
+  if (config.s3PublicBaseUrl) return config.s3PublicBaseUrl;
+  if (config.s3Bucket && config.awsRegion) {
+    return `https://${config.s3Bucket}.s3.${config.awsRegion}.amazonaws.com`;
+  }
+  return '';
+};
 
 const isS3Configured = () =>
   Boolean(config.awsAccessKeyId && config.awsSecretAccessKey && config.s3Bucket && config.awsRegion);
-
-const isCustomS3Endpoint = endpoint => {
-  const value = String(endpoint || '').trim();
-  if (!value) return false;
-  // Public bucket URLs and AWS regional hosts are not custom APIs. Using them
-  // with path-style addressing triggers PermanentRedirect.
-  if (/amazonaws\.com/i.test(value)) return false;
-  if (config.s3Bucket && value.includes(`${config.s3Bucket}.s3.`)) return false;
-  return true;
-};
 
 const mapS3Error = error => {
   const name = String(error?.name || error?.Code || '');
@@ -31,7 +27,7 @@ const mapS3Error = error => {
   if (name === 'PermanentRedirect' || /specified endpoint/i.test(message)) {
     return new HttpError(
       503,
-      `S3 bucket region does not match AWS_REGION (${config.awsRegion}). Set AWS_REGION to the bucket's region and do not set S3_ENDPOINT on Railway.`,
+      `S3 bucket region does not match AWS_REGION (${config.awsRegion}). Set AWS_REGION to the bucket's region.`,
     );
   }
   if (name === 'InvalidAccessKeyId' || name === 'SignatureDoesNotMatch' || name === 'AccessDenied') {
@@ -51,19 +47,13 @@ const getS3 = () => {
     throw new HttpError(503, 'Image storage is not configured. Set AWS S3 environment variables.');
   }
   if (!s3Client) {
-    const clientConfig = {
+    s3Client = new S3Client({
       region: config.awsRegion,
-      followRegionRedirects: true,
       credentials: {
         accessKeyId: config.awsAccessKeyId,
         secretAccessKey: config.awsSecretAccessKey,
       },
-    };
-    if (isCustomS3Endpoint(config.s3Endpoint)) {
-      clientConfig.endpoint = config.s3Endpoint;
-      clientConfig.forcePathStyle = true;
-    }
-    s3Client = new S3Client(clientConfig);
+    });
   }
   return s3Client;
 };
@@ -71,12 +61,11 @@ const getS3 = () => {
 const isPlaceholderPhoto = url => /picsum\.photos/i.test(String(url || ''));
 
 const photoKeyFromUrl = url => {
-  const base = publicBaseUrl();
-  const value = String(url || '');
-  if (!base || !value.startsWith(`${base}/`)) return null;
   try {
-    const { pathname } = new URL(value);
-    const key = decodeURIComponent(pathname.replace(/^\//, ''));
+    const parsed = new URL(String(url || ''));
+    const bucket = String(parsed.hostname || '').split('.s3')[0];
+    if (bucket !== config.s3Bucket) return null;
+    const key = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
     return key.startsWith('toilets/') ? key : null;
   } catch {
     return null;
@@ -86,6 +75,14 @@ const photoKeyFromUrl = url => {
 const isStoredPhotoUrl = url => Boolean(photoKeyFromUrl(url));
 
 const publicUrlForKey = key => `${publicBaseUrl()}/${key}`;
+
+const rewritePublicPhotoUrl = url => {
+  const key = photoKeyFromUrl(url);
+  return key ? publicUrlForKey(key) : url;
+};
+
+const rewritePhotoList = photos =>
+  (Array.isArray(photos) ? photos : []).map(item => rewritePublicPhotoUrl(item)).filter(Boolean);
 
 const compressImage = async buffer => {
   try {
@@ -157,7 +154,7 @@ const normalizePhotoList = (photos, { required = false } = {}) => {
   if (invalid.length) {
     throw new HttpError(400, 'Photos must be uploaded through this app');
   }
-  return list;
+  return rewritePhotoList(list);
 };
 
 module.exports = {
@@ -168,4 +165,5 @@ module.exports = {
   uploadToiletPhotos,
   deletePhotoUrls,
   normalizePhotoList,
+  rewritePhotoList,
 };

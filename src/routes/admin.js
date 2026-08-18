@@ -6,6 +6,7 @@ const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../mi
 const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
 const { publicTransaction } = require('../services/payments');
 const { listFavoriteToilets } = require('../services/favorites');
+const { rewritePhotoList } = require('../services/uploads');
 const { adminMaster, assertKey, normalizeItem } = require('../services/master');
 const { sendPushToUser, sendPushToUserId, sendToToken, sendToTopic } = require('../services/push');
 const { applyTemplate, listPublicTemplates } = require('../services/pushTemplates');
@@ -167,7 +168,9 @@ router.get('/users/:userId', (req, res, next) => {
       ...enrichUser(user, db),
       bookings: db.bookings.filter(item => item.userId === user.id),
       favorites: listFavoriteToilets(db, user),
-      toilets: db.toilets.filter(item => item.ownerId === user.id),
+      toilets: db.toilets
+        .filter(item => item.ownerId === user.id)
+        .map(item => ({ ...item, photos: rewritePhotoList(item.photos) })),
     });
   } catch (error) {
     next(error);
@@ -205,6 +208,7 @@ router.get('/listings', (req, res) => {
       };
       return {
         ...toilet,
+        photos: rewritePhotoList(toilet.photos),
         owner: publicUser(owner),
         ownerBlocked: Boolean(owner.blocked),
         bookingCount: db.bookings.filter(item => item.toiletId === toilet.id).length,

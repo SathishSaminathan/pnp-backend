@@ -2,6 +2,7 @@ const { DISCOVERY_FILTER_DEFAULTS } = require('../constants');
 const { isBlocked, isOpenNow, parseBounds, parseOrigin, haversineKm, isInBounds, roundKm } = require('../utils');
 const { publicMaster } = require('./master');
 const { isFavorite } = require('./favorites');
+const { rewritePhotoList } = require('./uploads');
 
 const isToiletEnabled = toilet => toilet?.enabled !== false;
 
@@ -19,6 +20,7 @@ const mapToilet = (toilet, user, reviews, origin, options = {}) => {
     isOwner: Boolean(user?.id && toilet.ownerId === user.id),
     isFavorite: isFavorite(user, toilet.id),
     distanceKm: computedKm == null ? Number(toilet.distanceKm || 0) : roundKm(computedKm),
+    photos: rewritePhotoList(toilet.photos),
   };
   if (options.includeReviews) {
     mapped.reviews = (reviews || []).filter(review => review.toiletId === toilet.id);
