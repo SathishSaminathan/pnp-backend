@@ -8,12 +8,22 @@ class HttpError extends Error {
 
 const normalizePhone = value => String(value || '').replace(/\D/g, '').slice(-10);
 
+const resolvePhotoUrl = value => {
+  if (!value) return '';
+  if (typeof value === 'object') {
+    return String(value.uri || value.url || value.photoUrl || '').trim();
+  }
+  return String(value).trim();
+};
+
 const publicUser = user => {
-  let photoUrl = String(user.photoUrl || '').trim();
+  let photoUrl = resolvePhotoUrl(user?.photoUrl || user?.photo || user?.avatar);
   try {
-    photoUrl = require('./services/uploads').rewritePublicPhotoUrl(photoUrl) || '';
+    if (photoUrl) {
+      photoUrl = require('./services/uploads').rewritePublicPhotoUrl(photoUrl) || photoUrl;
+    }
   } catch {
-    photoUrl = String(user.photoUrl || '').trim();
+    photoUrl = resolvePhotoUrl(user?.photoUrl);
   }
   return {
     id: user.id,
