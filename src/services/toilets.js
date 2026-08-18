@@ -38,6 +38,45 @@ const normalizeFilters = filters => ({
   facilities: Array.isArray(filters?.facilities) ? filters.facilities : [],
 });
 
+const toiletSearchHaystack = toilet =>
+  [
+    toilet.name,
+    toilet.description,
+    toilet.category,
+    toilet.address?.line1,
+    toilet.address?.area,
+    toilet.address?.city,
+    toilet.address?.state,
+    toilet.address?.postalCode,
+    ...(Array.isArray(toilet.facilities) ? toilet.facilities : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+const parseSearchTokens = search =>
+  String(search || '')
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+
+const matchesSearchQuery = (toilet, tokens) => {
+  if (!tokens.length) return true;
+  const haystack = toiletSearchHaystack(toilet);
+  return tokens.every(token => haystack.includes(token));
+};
+
+const searchRelevance = (toilet, query, tokens) => {
+  if (!query) return 2;
+  const name = String(toilet.name || '').toLowerCase();
+  const area = String(toilet.address?.area || '').toLowerCase();
+  const city = String(toilet.address?.city || '').toLowerCase();
+  if (name.includes(query) || tokens.every(token => name.includes(token))) return 0;
+  if (area.includes(query) || city.includes(query) || tokens.every(token => `${area} ${city}`.includes(token))) return 1;
+  return 2;
+};
+
 const listToilets = ({
   db,
   user,
@@ -52,6 +91,7 @@ const listToilets = ({
   maxLng,
 } = {}) => {
   const query = String(search || '').trim().toLowerCase();
+  const tokens = parseSearchTokens(query);
   const normalizedFilters = normalizeFilters(filters);
   const normalizedOrigin = parseOrigin(origin);
   const hasBoundsPayload = Boolean(
@@ -73,19 +113,13 @@ const listToilets = ({
 
   return mappedToilets
     .filter(toilet => {
-      const matchesQuery =
-        !query ||
-        [toilet.name, toilet.address?.area, toilet.address?.city, ...(toilet.facilities || [])]
-          .filter(Boolean)
-          .some(value => String(value).toLowerCase().includes(query));
-
-      if (!matchesQuery) return false;
+      if (!matchesSearchQuery(toilet, tokens)) return false;
       if (normalizedFilters.favoritesOnly) return toilet.isFavorite;
       if (normalizedFilters.openNow && !isOpenNow(toilet.operatingHours)) return false;
       if (normalizedFilters.verifiedOnly && !toilet.verified) return false;
       if (toilet.basePrice > Number(normalizedFilters.maxPrice || DISCOVERY_FILTER_DEFAULTS.maxPrice)) return false;
       if (toilet.rating < Number(normalizedFilters.minRating || 0)) return false;
-      if (!normalizedBounds && toilet.distanceKm > Number(normalizedFilters.maxDistanceKm || DISCOVERY_FILTER_DEFAULTS.maxDistanceKm)) {
+      if (!query && !normalizedBounds && toilet.distanceKm > Number(normalizedFilters.maxDistanceKm || DISCOVERY_FILTER_DEFAULTS.maxDistanceKm)) {
         return false;
       }
       if (normalizedFilters.availability.length && !normalizedFilters.availability.includes(toilet.availability)) return false;
@@ -100,6 +134,10 @@ const listToilets = ({
       if (sortBy === 'price_low') return a.basePrice - b.basePrice;
       if (sortBy === 'price_high') return b.basePrice - a.basePrice;
       if (sortBy === 'rating') return b.rating - a.rating;
+      if (query) {
+        const relevanceDiff = searchRelevance(a, query, tokens) - searchRelevance(b, query, tokens);
+        if (relevanceDiff !== 0) return relevanceDiff;
+      }
       if (normalizedOrigin && a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
       if (a.isFavorite !== b.isFavorite) return a.isFavorite ? -1 : 1;
       if (a.verified !== b.verified) return a.verified ? -1 : 1;
