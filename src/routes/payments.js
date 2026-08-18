@@ -102,12 +102,16 @@ router.post('/verify', (req, res, next) => {
 
     const taxAmount = 2;
     const platformFee = Number(quote.platformFee || config.platformFee);
+    const address = toilet.address || {};
     const transaction = {
       id: nextId('txn'),
       ownerId: toilet.ownerId,
       bookingId: booking.id,
-      toiletId: quote.toiletId,
-      toiletName: quote.toiletName,
+      toiletId: quote.toiletId || toilet.id,
+      toiletName: quote.toiletName || toilet.name,
+      area: address.area || '',
+      city: address.city || toilet.city || '',
+      line1: address.line1 || '',
       grossAmount: quote.totalAmount,
       platformFee,
       taxAmount,

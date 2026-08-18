@@ -22,6 +22,29 @@ const transactionTime = (item, bookings = []) => {
 
 const sumField = (items, key) => items.reduce((total, item) => total + toMoney(item[key]), 0);
 
+const toiletAddress = toilet => {
+  const address = toilet?.address || {};
+  return {
+    line1: String(address.line1 || '').trim(),
+    area: String(address.area || '').trim(),
+    city: String(address.city || toilet?.city || '').trim(),
+  };
+};
+
+const formatLocation = (...parts) =>
+  parts
+    .map(part => String(part || '').trim())
+    .filter(part => part && part !== '—' && part !== '--');
+
+
+const namesMatch = (left, right) =>
+  String(left || '').trim().toLowerCase() === String(right || '').trim().toLowerCase() && Boolean(String(left || '').trim());
+
+const matchToilet = (item, toilets = []) =>
+  toilets.find(entry => entry.id && entry.id === item.toiletId) ||
+  toilets.find(entry => namesMatch(entry.name, item.toiletName)) ||
+  null;
+
 const summarizeTransactions = (transactions = [], { toilets = [], bookings = [] } = {}) => {
   const paid = transactions
     .map(publicTransaction)
@@ -39,14 +62,19 @@ const summarizeTransactions = (transactions = [], { toilets = [], bookings = [] 
 
   const byToiletMap = {};
   paid.forEach(item => {
-    const key = item.toiletId || item.toiletName || item.id;
+    const toilet = matchToilet(item, toilets);
+    const fromToilet = toiletAddress(toilet);
+    const key = item.toiletId || toilet?.id || item.toiletName || item.id;
     if (!byToiletMap[key]) {
-      const toilet = toilets.find(entry => entry.id === item.toiletId);
+      const area = fromToilet.area || String(item.area || item.address?.area || '').trim();
+      const city = fromToilet.city || String(item.city || item.address?.city || '').trim();
+      const line1 = fromToilet.line1 || String(item.line1 || item.address?.line1 || '').trim();
       byToiletMap[key] = {
-        toiletId: item.toiletId || null,
+        toiletId: item.toiletId || toilet?.id || null,
         name: toilet?.name || item.toiletName || 'Toilet',
-        area: toilet?.address?.area || '',
-        city: toilet?.address?.city || '',
+        area,
+        city,
+        location: formatLocation(area, city).join(', ') || line1,
         visitCount: 0,
         grossAmount: 0,
         fees: 0,
