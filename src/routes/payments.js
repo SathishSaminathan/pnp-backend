@@ -4,6 +4,7 @@ const { BOOKING_STATUS } = require('../constants');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { saveQuote, getQuote, saveOrder, getOrder } = require('../services/payments');
+const { sendPushToUserId } = require('../services/push');
 
 const router = express.Router();
 
@@ -133,6 +134,23 @@ router.post('/verify', (req, res, next) => {
         createdAt: new Date().toISOString(),
       });
       return current;
+    });
+
+    const customerPush = {
+      title: 'Payment confirmed',
+      body: `Payment confirmed for ${booking.toiletName}.`,
+      data: { actionType: 'BROADCAST', bookingId: booking.id, audience: 'customer' },
+    };
+    const ownerPush = {
+      title: 'New booking received',
+      body: `A customer booked ${booking.toiletName} for ${booking.date}, ${booking.time}.`,
+      data: { actionType: 'BROADCAST', bookingId: booking.id, audience: 'provider' },
+    };
+    Promise.allSettled([
+      sendPushToUserId(req.user.id, customerPush),
+      sendPushToUserId(toilet.ownerId, ownerPush),
+    ]).catch(error => {
+      console.warn('Push: failed to send booking notifications', error?.message || error);
     });
 
     res.json(booking);

@@ -18,6 +18,7 @@ const publicUser = user => ({
   blocked: Boolean(user.blocked),
   blockedAt: user.blockedAt || null,
   blockedReason: user.blockedReason || '',
+  hasDeviceToken: Boolean(user.deviceToken),
 });
 
 const isBlocked = user => Boolean(user?.blocked);

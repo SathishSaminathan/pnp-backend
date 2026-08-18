@@ -1,5 +1,6 @@
 const express = require('express');
 const { sendOtp, consumeOtp } = require('../services/otp');
+const { setUserDeviceToken } = require('../services/users');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { publicUser, normalizePhone, assertNotBlocked } = require('../utils');
 const { signAccessToken, signRefreshToken } = require('../middleware/auth');
@@ -20,7 +21,7 @@ router.post('/otp', (req, res, next) => {
 
 router.post('/otp/verify', (req, res, next) => {
   try {
-    const { phone, otp, requestId } = req.body || {};
+    const { phone, otp, requestId, deviceToken } = req.body || {};
     const normalizedPhone = consumeOtp({ phone, otp, requestId });
     const db = readDb();
     let user = db.users.find(item => item.phone === normalizedPhone);
@@ -39,9 +40,18 @@ router.post('/otp/verify', (req, res, next) => {
         profileCompleted: false,
         favoriteToiletIds: [],
         blocked: false,
+        deviceToken: '',
       };
+    }
+
+    if (isNewUser || String(deviceToken || '').trim()) {
       updateDb(current => {
-        current.users.push(user);
+        if (isNewUser) {
+          current.users.push(user);
+        }
+        if (String(deviceToken || '').trim()) {
+          user = setUserDeviceToken(current, user.id, deviceToken);
+        }
         return current;
       });
     }

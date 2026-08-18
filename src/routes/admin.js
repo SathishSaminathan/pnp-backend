@@ -6,6 +6,7 @@ const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../mi
 const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
 const { listFavoriteToilets } = require('../services/favorites');
 const { adminMaster, assertKey, normalizeItem } = require('../services/master');
+const { sendPushToUserId, sendToToken, sendToTopic } = require('../services/push');
 
 const router = express.Router();
 
@@ -39,6 +40,39 @@ router.use(requireAdmin);
 
 router.get('/me', (req, res) => {
   res.json({ success: true, data: { data: req.admin } });
+});
+
+router.post('/notifications/push', async (req, res, next) => {
+  try {
+    const title = String(req.body?.title || '').trim();
+    const body = String(req.body?.body || '').trim();
+    const userId = String(req.body?.userId || '').trim();
+    const token = String(req.body?.token || req.body?.deviceToken || '').trim();
+    const topic = req.body?.topic != null ? String(req.body.topic).trim() : '';
+    const data = req.body?.data && typeof req.body.data === 'object' ? req.body.data : {};
+
+    if (!title || !body) {
+      throw new HttpError(400, 'title and body are required');
+    }
+
+    const payload = { title, body, data };
+    let result;
+
+    if (token) {
+      result = await sendToToken(token, payload);
+    } else if (userId) {
+      result = await sendPushToUserId(userId, payload);
+    } else {
+      result = await sendToTopic(topic || config.fcmBroadcastTopic, {
+        ...payload,
+        data: { actionType: data.actionType || 'BROADCAST', ...data },
+      });
+    }
+
+    res.json({ ok: !result?.error && !result?.skipped, result });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get('/overview', (_req, res) => {

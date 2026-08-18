@@ -10,4 +10,9 @@ module.exports = {
   platformFee: 5,
   adminEmail: String(process.env.ADMIN_EMAIL || 'admin@pnp.app').toLowerCase().trim(),
   adminPassword: String(process.env.ADMIN_PASSWORD || 'Admin@123'),
+  fcmBroadcastTopic: String(process.env.FCM_BROADCAST_TOPIC || 'pnp_broadcast').trim(),
+  firebaseServiceAccountPath: String(
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '',
+  ).trim(),
+  firebaseServiceAccountJson: String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim(),
 };

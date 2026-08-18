@@ -47,6 +47,10 @@ const mapUser = row => ({
   blocked: Boolean(row.blocked),
   blockedAt: row.blocked_at ? new Date(row.blocked_at).toISOString() : null,
   blockedReason: row.blocked_reason || '',
+  deviceToken: row.device_token || '',
+  deviceTokenUpdatedAt: row.device_token_updated_at
+    ? new Date(row.device_token_updated_at).toISOString()
+    : null,
 });
 
 const loadFromPostgres = async () => {
@@ -111,9 +115,9 @@ const persistToPostgres = async db => {
       await client.query(
         `INSERT INTO users (
             id, phone, name, city, profile_completed, favorite_toilet_ids,
-            blocked, blocked_at, blocked_reason, updated_at
+            blocked, blocked_at, blocked_reason, device_token, device_token_updated_at, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, NOW())
           ON CONFLICT (id) DO UPDATE SET
             phone = EXCLUDED.phone,
             name = EXCLUDED.name,
@@ -123,6 +127,8 @@ const persistToPostgres = async db => {
             blocked = EXCLUDED.blocked,
             blocked_at = EXCLUDED.blocked_at,
             blocked_reason = EXCLUDED.blocked_reason,
+            device_token = EXCLUDED.device_token,
+            device_token_updated_at = EXCLUDED.device_token_updated_at,
             updated_at = NOW()`,
         [
           user.id,
@@ -134,6 +140,8 @@ const persistToPostgres = async db => {
           Boolean(user.blocked),
           user.blockedAt || null,
           user.blockedReason || '',
+          user.deviceToken || '',
+          user.deviceTokenUpdatedAt || null,
         ],
       );
     }

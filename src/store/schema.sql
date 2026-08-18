@@ -8,12 +8,19 @@ CREATE TABLE IF NOT EXISTS users (
   blocked BOOLEAN NOT NULL DEFAULT FALSE,
   blocked_at TIMESTAMPTZ,
   blocked_reason TEXT NOT NULL DEFAULT '',
+  device_token TEXT NOT NULL DEFAULT '',
+  device_token_updated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS device_token TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS device_token_updated_at TIMESTAMPTZ;
+
 CREATE UNIQUE INDEX IF NOT EXISTS users_phone_idx ON users (phone);
 CREATE INDEX IF NOT EXISTS users_blocked_idx ON users (blocked);
+CREATE INDEX IF NOT EXISTS users_device_token_idx ON users (device_token)
+  WHERE device_token <> '';
 
 CREATE TABLE IF NOT EXISTS toilets (
   id TEXT PRIMARY KEY,
