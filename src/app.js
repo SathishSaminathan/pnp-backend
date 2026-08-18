@@ -57,6 +57,7 @@ const createApp = () => {
         ok: true,
         service: 'pnp-backend',
         database: db && isReady() ? 'postgres' : 'down',
+        firebaseAdmin: require('./services/push').getFirebaseStatus().configured,
         message: 'Welcome to PNP. Backend is running.',
       });
     } catch (error) {

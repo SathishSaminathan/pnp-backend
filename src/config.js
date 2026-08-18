@@ -12,7 +12,8 @@ module.exports = {
   adminPassword: String(process.env.ADMIN_PASSWORD || 'Admin@123'),
   fcmBroadcastTopic: String(process.env.FCM_BROADCAST_TOPIC || 'pnp_broadcast').trim(),
   firebaseServiceAccountPath: String(
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '',
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS || '',
   ).trim(),
   firebaseServiceAccountJson: String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim(),
+  firebaseServiceAccountBase64: String(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || '').trim(),
 };

@@ -47,6 +47,11 @@ router.get('/notifications/templates', (_req, res) => {
   res.json({ items: listPublicTemplates() });
 });
 
+router.get('/notifications/status', (_req, res) => {
+  const { getFirebaseStatus } = require('../services/push');
+  res.json(getFirebaseStatus());
+});
+
 router.post('/notifications/push', async (req, res, next) => {
   try {
     const templateId = String(req.body?.templateId || '').trim();

@@ -23,16 +23,28 @@ const resolveServiceAccountPath = () => {
   return path.resolve(__dirname, '../../secrets/firebase-adminsdk.json');
 };
 
+const unwrapEnvText = raw => {
+  let text = String(raw || '').trim();
+  if (!text) return '';
+  if (
+    (text.startsWith("'") && text.endsWith("'")) ||
+    (text.startsWith('"') && text.endsWith('"') && !text.startsWith('{'))
+  ) {
+    text = text.slice(1, -1).trim();
+  }
+  return text;
+};
+
 const parseJsonMaybe = raw => {
   if (!raw) return null;
   if (typeof raw === 'object') return raw;
-  const text = String(raw).trim();
+  const text = unwrapEnvText(raw);
   if (!text) return null;
   try {
     const parsed = JSON.parse(text);
     return typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
   } catch (error) {
-    throw new Error(`FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON: ${error.message}`);
+    throw new Error(`Firebase service account JSON is invalid: ${error.message}`);
   }
 };
 
@@ -54,15 +66,28 @@ const normalizeServiceAccount = raw => {
   };
 };
 
-const loadServiceAccount = () => {
-  if (config.firebaseServiceAccountJson) {
-    return normalizeServiceAccount(config.firebaseServiceAccountJson);
-  }
-  const filePath = resolveServiceAccountPath();
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
+const loadFromPath = filePath => {
+  if (!filePath || !fs.existsSync(filePath)) return null;
   return normalizeServiceAccount(fs.readFileSync(filePath, 'utf8'));
+};
+
+const loadServiceAccount = () => {
+  const jsonEnv = unwrapEnvText(config.firebaseServiceAccountJson);
+  if (jsonEnv) {
+    if (jsonEnv.startsWith('{')) {
+      return normalizeServiceAccount(jsonEnv);
+    }
+    const asPath = path.isAbsolute(jsonEnv) ? jsonEnv : path.resolve(process.cwd(), jsonEnv);
+    const fromJsonPath = loadFromPath(asPath);
+    if (fromJsonPath) return fromJsonPath;
+  }
+
+  const base64 = unwrapEnvText(config.firebaseServiceAccountBase64);
+  if (base64) {
+    return normalizeServiceAccount(Buffer.from(base64, 'base64').toString('utf8'));
+  }
+
+  return loadFromPath(resolveServiceAccountPath());
 };
 
 const getMessaging = () => {
@@ -80,7 +105,7 @@ const getMessaging = () => {
     if (!serviceAccount) {
       initError = 'missing_firebase_admin';
       console.warn(
-        'Push: Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON on Railway, or FIREBASE_SERVICE_ACCOUNT_PATH locally.',
+        'Push: Firebase Admin is not configured. On Railway set FIREBASE_SERVICE_ACCOUNT_JSON to the minified service-account JSON (not a file path).',
       );
       return null;
     }
@@ -90,6 +115,7 @@ const getMessaging = () => {
       projectId: serviceAccount.project_id,
     });
     messagingClient = getFirebaseMessaging(app);
+    console.log(`Push: Firebase Admin ready (${serviceAccount.project_id})`);
     return messagingClient;
   } catch (error) {
     initError = error.message || 'firebase_init_failed';
@@ -97,6 +123,12 @@ const getMessaging = () => {
     return null;
   }
 };
+
+const getFirebaseStatus = () => ({
+  configured: Boolean(getMessaging()),
+  reason: initError || null,
+  topic: config.fcmBroadcastTopic,
+});
 
 const stringifyData = data => {
   const payload = data && typeof data === 'object' ? data : {};
@@ -219,4 +251,5 @@ module.exports = {
   sendBroadcast,
   sendPushToUser,
   sendPushToUserId,
+  getFirebaseStatus,
 };
