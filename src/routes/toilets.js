@@ -4,6 +4,8 @@ const { readDb, updateDb, nextId } = require('../store/db');
 const { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
 const { facilityValues } = require('../services/master');
 const { listFavoriteToilets, toggleFavorite } = require('../services/favorites');
+const { photoUpload } = require('../middleware/upload');
+const { deletePhotoUrls, normalizePhotoList, uploadToiletPhotos } = require('../services/uploads');
 
 const router = express.Router();
 
@@ -35,6 +37,21 @@ router.get('/mine', (req, res) => {
 
 router.get('/favorites', (req, res) => {
   res.json(listFavoriteToilets(readDb(), req.user));
+});
+
+router.post('/photos', (req, res, next) => {
+  photoUpload.array('photos', 4)(req, res, async err => {
+    if (err) {
+      next(err);
+      return;
+    }
+    try {
+      const photos = await uploadToiletPhotos({ userId: req.user.id, files: req.files || [] });
+      res.status(201).json({ photos });
+    } catch (error) {
+      next(error);
+    }
+  });
 });
 
 router.get('/:toiletId/bookings', (req, res) => {
@@ -118,47 +135,52 @@ router.delete('/:toiletId/favorite', (req, res, next) => {
   }
 });
 
-router.post('/', (req, res) => {
-  const payload = req.body || {};
-  let created;
+router.post('/', (req, res, next) => {
+  try {
+    const payload = req.body || {};
+    const photos = normalizePhotoList(payload.photos, { required: true });
+    let created;
 
-  updateDb(db => {
-    created = {
-      id: nextId('toilet'),
-      ownerId: req.user.id,
-      rating: 0,
-      reviewCount: 0,
-      verified: false,
-      availability: payload.availability || (db.master?.availability || []).find(item => item.active !== false)?.value || 'AVAILABLE',
-      distanceKm: 0,
-      priceLabel: 'Per use',
-      basePrice: Number(payload.basePrice || 20),
-      photos: payload.photos || ['https://picsum.photos/seed/pnp-new-toilet/800/500'],
-      facilities: payload.facilities || facilityValues(db).slice(0, 6),
-      coordinates: payload.coordinates || { latitude: 13.05, longitude: 80.27 },
-      address: payload.address || {
-        line1: 'Added Address',
-        area: 'Adyar',
-        city: req.user.city || 'Chennai',
-        state: 'Tamil Nadu',
-        country: 'India',
-        postalCode: '600020',
-      },
-      operatingHours: payload.operatingHours || '06:00 AM - 10:00 PM',
-      name: payload.name,
-      description: payload.description,
-      category: payload.category || 'Premium',
-      enabled: payload.enabled !== false,
-    };
-    db.toilets.unshift(created);
-    return db;
-  });
+    updateDb(db => {
+      created = {
+        id: nextId('toilet'),
+        ownerId: req.user.id,
+        rating: 0,
+        reviewCount: 0,
+        verified: false,
+        availability: payload.availability || (db.master?.availability || []).find(item => item.active !== false)?.value || 'AVAILABLE',
+        distanceKm: 0,
+        priceLabel: 'Per use',
+        basePrice: Number(payload.basePrice || 20),
+        photos,
+        facilities: payload.facilities || facilityValues(db).slice(0, 6),
+        coordinates: payload.coordinates || { latitude: 13.05, longitude: 80.27 },
+        address: payload.address || {
+          line1: 'Added Address',
+          area: 'Adyar',
+          city: req.user.city || 'Chennai',
+          state: 'Tamil Nadu',
+          country: 'India',
+          postalCode: '600020',
+        },
+        operatingHours: payload.operatingHours || '06:00 AM - 10:00 PM',
+        name: payload.name,
+        description: payload.description,
+        category: payload.category || 'Premium',
+        enabled: payload.enabled !== false,
+      };
+      db.toilets.unshift(created);
+      return db;
+    });
 
-  const db = readDb();
-  res.status(201).json(mapToilet(created, req.user, db.reviews));
+    const db = readDb();
+    res.status(201).json(mapToilet(created, req.user, db.reviews));
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.put('/:toiletId', (req, res, next) => {
+router.put('/:toiletId', async (req, res, next) => {
   try {
     const { toiletId } = req.params;
     const payload = { ...(req.body || {}) };
@@ -166,17 +188,29 @@ router.put('/:toiletId', (req, res, next) => {
     if (payload.enabled != null) {
       payload.enabled = payload.enabled !== false;
     }
+    if (payload.photos) {
+      payload.photos = normalizePhotoList(payload.photos, { required: true });
+    }
 
+    let removedPhotos = [];
     updateDb(db => {
       const toilet = getToiletOrThrow(db, toiletId);
       if (toilet.ownerId !== req.user.id) {
         throw new HttpError(403, 'You can only update your own listings');
+      }
+      if (payload.photos) {
+        const nextPhotos = new Set(payload.photos);
+        removedPhotos = (toilet.photos || []).filter(url => !nextPhotos.has(url));
       }
       db.toilets = db.toilets.map(item =>
         item.id === toiletId ? { ...item, ...payload, id: toiletId, ownerId: item.ownerId, priceLabel: 'Per use' } : item,
       );
       return db;
     });
+
+    if (removedPhotos.length) {
+      await deletePhotoUrls(removedPhotos);
+    }
 
     const db = readDb();
     res.json(mapToilet(getToiletOrThrow(db, toiletId), req.user, db.reviews));

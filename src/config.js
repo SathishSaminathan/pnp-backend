@@ -16,4 +16,17 @@ module.exports = {
   ).trim(),
   firebaseServiceAccountJson: String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim(),
   firebaseServiceAccountBase64: String(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || '').trim(),
+  awsRegion: String(process.env.AWS_REGION || 'ap-south-1').trim(),
+  awsAccessKeyId: String(process.env.AWS_ACCESS_KEY_ID || '').trim(),
+  awsSecretAccessKey: String(process.env.AWS_SECRET_ACCESS_KEY || '').trim(),
+  s3Bucket: String(process.env.S3_BUCKET || '').trim(),
+  s3PublicBaseUrl: String(
+    process.env.S3_PUBLIC_BASE_URL ||
+      (process.env.S3_BUCKET
+        ? `https://${process.env.S3_BUCKET}.s3.${process.env.AWS_REGION || 'ap-south-1'}.amazonaws.com`
+        : ''),
+  )
+    .trim()
+    .replace(/\/$/, ''),
+  s3Endpoint: String(process.env.S3_ENDPOINT || '').trim(),
 };
