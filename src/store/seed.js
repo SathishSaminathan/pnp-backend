@@ -70,6 +70,7 @@ const createSeed = () => {
       reviewCount: 112,
       distanceKm: 0.4,
       verified: true,
+      enabled: true,
       availability: 'AVAILABLE',
       operatingHours: '05:00 AM - 11:00 PM',
       address: {
@@ -101,6 +102,7 @@ const createSeed = () => {
       reviewCount: 74,
       distanceKm: 1.8,
       verified: true,
+      enabled: true,
       availability: 'TEMPORARILY_HELD',
       operatingHours: '06:00 AM - 10:00 PM',
       address: {
@@ -131,6 +133,7 @@ const createSeed = () => {
       reviewCount: 55,
       distanceKm: 3.2,
       verified: false,
+      enabled: true,
       availability: 'AVAILABLE',
       operatingHours: '24 Hours',
       address: {

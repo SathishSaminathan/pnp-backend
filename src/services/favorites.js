@@ -14,7 +14,7 @@ const listFavoriteToilets = (db, user) => {
   return ids
     .map(id => db.toilets.find(item => item.id === id))
     .filter(toilet => {
-      if (!toilet) return false;
+      if (!toilet || toilet.enabled === false) return false;
       const owner = db.users.find(item => item.id === toilet.ownerId);
       return !owner?.blocked;
     })

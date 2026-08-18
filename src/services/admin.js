@@ -26,6 +26,7 @@ const enrichOwner = (user, db) => {
       id: item.id,
       name: item.name,
       verified: item.verified,
+      enabled: item.enabled !== false,
       availability: item.availability,
       basePrice: item.basePrice,
       rating: item.rating,

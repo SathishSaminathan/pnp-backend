@@ -1,7 +1,7 @@
 const express = require('express');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
-const { mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
+const { isToiletEnabled, mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
 const { facilityValues } = require('../services/master');
 const { listFavoriteToilets, toggleFavorite } = require('../services/favorites');
 
@@ -43,10 +43,39 @@ router.get('/:toiletId/bookings', (req, res) => {
   res.json(db.bookings.filter(item => item.toiletId === req.params.toiletId));
 });
 
+router.patch('/:toiletId/enabled', (req, res, next) => {
+  try {
+    const { toiletId } = req.params;
+    if (typeof req.body?.enabled !== 'boolean') {
+      throw new HttpError(400, 'enabled must be a boolean');
+    }
+    let mapped;
+
+    updateDb(db => {
+      const toilet = getToiletOrThrow(db, toiletId);
+      if (toilet.ownerId !== req.user.id) {
+        throw new HttpError(403, 'You can only update your own listings');
+      }
+      db.toilets = db.toilets.map(item =>
+        item.id === toiletId ? { ...item, enabled: req.body.enabled } : item,
+      );
+      mapped = mapToilet(db.toilets.find(item => item.id === toiletId), req.user, db.reviews);
+      return db;
+    });
+
+    res.json(mapped);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:toiletId', (req, res, next) => {
   try {
     const db = readDb();
     const toilet = getToiletOrThrow(db, req.params.toiletId);
+    if (!isToiletEnabled(toilet) && toilet.ownerId !== req.user.id) {
+      throw new HttpError(404, 'Toilet not found');
+    }
     res.json(mapToilet(toilet, req.user, db.reviews));
   } catch (error) {
     next(error);
@@ -120,6 +149,7 @@ router.post('/', (req, res) => {
       name: payload.name,
       description: payload.description,
       category: payload.category || 'Premium',
+      enabled: payload.enabled !== false,
     };
     db.toilets.unshift(created);
     return db;
@@ -134,6 +164,9 @@ router.put('/:toiletId', (req, res, next) => {
     const { toiletId } = req.params;
     const payload = { ...(req.body || {}) };
     delete payload.id;
+    if (payload.enabled != null) {
+      payload.enabled = payload.enabled !== false;
+    }
 
     updateDb(db => {
       const toilet = getToiletOrThrow(db, toiletId);

@@ -3,10 +3,13 @@ const { isBlocked, isOpenNow, parseBounds, parseOrigin, haversineKm, isInBounds,
 const { publicMaster } = require('./master');
 const { isFavorite } = require('./favorites');
 
+const isToiletEnabled = toilet => toilet?.enabled !== false;
+
 const mapToilet = (toilet, user, reviews, origin) => {
   const computedKm = haversineKm(origin, toilet.coordinates);
   return {
     ...toilet,
+    enabled: isToiletEnabled(toilet),
     isFavorite: isFavorite(user, toilet.id),
     distanceKm: computedKm == null ? Number(toilet.distanceKm || 0) : roundKm(computedKm),
     reviews: (reviews || []).filter(review => review.toiletId === toilet.id),
@@ -46,6 +49,7 @@ const listToilets = ({
 
   const mappedToilets = db.toilets
     .filter(toilet => {
+      if (!isToiletEnabled(toilet)) return false;
       const owner = db.users.find(item => item.id === toilet.ownerId);
       if (isBlocked(owner)) return false;
       if (normalizedBounds && !isInBounds(toilet.coordinates, normalizedBounds)) return false;
@@ -91,13 +95,14 @@ const listToilets = ({
 
 const discoveryFilters = db => {
   const master = publicMaster(db);
+  const visibleToilets = db.toilets.filter(isToiletEnabled);
   const facilities = master.facilities.map(item => ({
     name: item.value,
     label: item.label,
-    count: db.toilets.filter(toilet => (toilet.facilities || []).includes(item.value)).length,
+    count: visibleToilets.filter(toilet => (toilet.facilities || []).includes(item.value)).length,
   }));
-  const maxPrice = Math.max(...db.toilets.map(item => item.basePrice), DISCOVERY_FILTER_DEFAULTS.maxPrice);
-  const maxDistanceKm = Math.max(...db.toilets.map(item => item.distanceKm), DISCOVERY_FILTER_DEFAULTS.maxDistanceKm);
+  const maxPrice = Math.max(...visibleToilets.map(item => item.basePrice), DISCOVERY_FILTER_DEFAULTS.maxPrice);
+  const maxDistanceKm = Math.max(...visibleToilets.map(item => item.distanceKm), DISCOVERY_FILTER_DEFAULTS.maxDistanceKm);
 
   return {
     defaults: { ...DISCOVERY_FILTER_DEFAULTS, maxPrice, maxDistanceKm },
@@ -121,4 +126,4 @@ const discoveryFilters = db => {
   };
 };
 
-module.exports = { mapToilet, listToilets, discoveryFilters };
+module.exports = { isToiletEnabled, mapToilet, listToilets, discoveryFilters };
