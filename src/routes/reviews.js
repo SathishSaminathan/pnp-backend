@@ -4,41 +4,65 @@ const { readDb } = require('../store/db');
 
 const router = express.Router();
 
-const reviewerId = (review, db) => {
-  if (review?.userId) return review.userId;
-  if (!review?.bookingId) return null;
-  return db.bookings.find(item => item.id === review.bookingId)?.userId || null;
+const sameId = (left, right) =>
+  left != null && right != null && String(left) === String(right);
+
+const asObject = value => {
+  if (!value || typeof value === 'object') return value || null;
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
 };
+
+const reviewerId = (review, db) => {
+  const direct = review?.userId || review?.user_id || review?.user?.id;
+  if (direct) return String(direct);
+  const bookingId = review?.bookingId || review?.booking_id;
+  if (!bookingId) return null;
+  const booking = (db.bookings || []).find(item => sameId(item.id, bookingId));
+  const fromBooking = booking?.userId || booking?.user_id;
+  return fromBooking ? String(fromBooking) : null;
+};
+
+const reviewToiletId = review => review?.toiletId || review?.toilet_id || null;
 
 const serializeReview = (review, db) => ({
   ...mapReview(review),
   userId: reviewerId(review, db),
-  toiletName: db.toilets.find(item => item.id === review.toiletId)?.name || '',
+  toiletId: reviewToiletId(review),
+  toiletName: (db.toilets || []).find(item => sameId(item.id, reviewToiletId(review)))?.name || '',
 });
 
 router.get('/', (req, res) => {
   const toiletId = String(req.query.toiletId || '').trim();
-  const scope = String(req.query.scope || '').trim().toLowerCase();
+  const scope = String(req.query.scope || (toiletId ? '' : 'given'))
+    .trim()
+    .toLowerCase();
   const db = readDb();
-  const userId = req.user.id;
+  const userId = String(req.user.id);
   const ownedToiletIds = new Set(
-    db.toilets.filter(item => item.ownerId === userId).map(item => item.id),
+    (db.toilets || [])
+      .filter(item => sameId(item.ownerId || item.owner_id, userId))
+      .map(item => String(item.id)),
   );
 
-  let items = db.reviews;
+  const reviews = (db.reviews || []).map(asObject).filter(Boolean);
 
+  let items;
   if (toiletId) {
-    items = items.filter(review => review.toiletId === toiletId);
-  } else if (scope === 'given') {
-    items = items.filter(review => reviewerId(review, db) === userId);
+    items = reviews.filter(review => sameId(reviewToiletId(review), toiletId));
   } else if (scope === 'received') {
-    items = items.filter(
-      review => ownedToiletIds.has(review.toiletId) && reviewerId(review, db) !== userId,
-    );
+    items = reviews.filter(review => {
+      const toilet = reviewToiletId(review);
+      if (!toilet || !ownedToiletIds.has(String(toilet))) return false;
+      return reviewerId(review, db) !== userId;
+    });
   } else {
-    items = items.filter(
-      review => reviewerId(review, db) === userId || ownedToiletIds.has(review.toiletId),
-    );
+    items = reviews.filter(review => reviewerId(review, db) === userId);
   }
 
   res.json(items.map(review => serializeReview(review, db)));

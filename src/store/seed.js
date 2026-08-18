@@ -65,9 +65,9 @@ const createSeed = () => {
     {
       id: 'review_003',
       toiletId: 'toilet_002',
-      bookingId: 'booking_002',
-      userId: 'user_001',
-      userName: 'Priya Raman',
+      bookingId: null,
+      userId: 'user_guest_kavya',
+      userName: 'Kavya M',
       rating: 4.5,
       cleanliness: 5,
       safety: 4,
@@ -201,8 +201,7 @@ const createSeed = () => {
       amount: 20,
       paymentStatus: 'PAID',
       bookingStatus: BOOKING_STATUS.COMPLETED,
-      reviewSubmitted: true,
-      reviewId: 'review_003',
+      reviewSubmitted: false,
     },
   ];
 
