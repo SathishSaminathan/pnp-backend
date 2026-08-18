@@ -237,10 +237,10 @@ const setListingVerified = async (req, res, next) => {
     });
     const push = owner
       ? await sendPushToUser(owner, {
-          title: template.title,
-          body: template.body,
-          data: { actionType: template.actionType, toiletId: saved.id },
-        })
+        title: template.title,
+        body: template.body,
+        data: { actionType: template.actionType, toiletId: saved.id },
+      })
       : null;
 
     res.json({
@@ -288,6 +288,7 @@ router.get('/reviews', (_req, res) => {
   const items = db.reviews.map(review => ({
     ...mapReview(review),
     toiletName: db.toilets.find(item => item.id === review.toiletId)?.name || '',
+    user: publicUser(db.users.find(item => item.id === review.userId) || { name: review.userName || '', photoUrl: '' }),
   }));
   res.json({ items, total: items.length });
 });

@@ -19,14 +19,6 @@ const enrichUser = (user, db) => {
   };
 };
 
-const firstListingPhoto = toilets => {
-  for (const toilet of toilets || []) {
-    const photo = rewritePhotoList(toilet.photos || [])[0];
-    if (photo) return photo;
-  }
-  return '';
-};
-
 const enrichOwner = (user, db) => {
   const toilets = db.toilets.filter(item => item.ownerId === user.id);
   const bookings = db.bookings.filter(item => toilets.some(toilet => toilet.id === item.toiletId));
@@ -34,7 +26,6 @@ const enrichOwner = (user, db) => {
   const profile = enrichUser(user, db);
   return {
     ...profile,
-    photoUrl: profile.photoUrl || firstListingPhoto(toilets),
     listings: toilets.map(item => ({
       id: item.id,
       name: item.name,
