@@ -37,6 +37,7 @@ router.post('/otp/verify', (req, res, next) => {
         phone: normalizedPhone,
         name: '',
         city: '',
+        photoUrl: '',
         profileCompleted: false,
         favoriteToiletIds: [],
         blocked: false,

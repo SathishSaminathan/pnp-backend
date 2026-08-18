@@ -59,19 +59,22 @@ const getS3 = () => {
 
 const isPlaceholderPhoto = url => /picsum\.photos/i.test(String(url || ''));
 
-const photoKeyFromUrl = url => {
+const photoKeyFromUrl = (url, prefix = '') => {
   try {
     const parsed = new URL(String(url || ''));
     const bucket = String(parsed.hostname || '').split('.s3')[0];
-    if (bucket !== config.s3Bucket) return null;
+    if (config.s3Bucket && bucket !== config.s3Bucket) return null;
     const key = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
-    return key.startsWith('toilets/') ? key : null;
+    if (prefix) return key.startsWith(prefix) ? key : null;
+    if (key.startsWith('toilets/') || key.startsWith('profiles/')) return key;
+    return null;
   } catch {
     return null;
   }
 };
 
-const isStoredPhotoUrl = url => Boolean(photoKeyFromUrl(url));
+const isStoredPhotoUrl = url => Boolean(photoKeyFromUrl(url, 'toilets/'));
+const isStoredProfilePhotoUrl = url => Boolean(photoKeyFromUrl(url, 'profiles/'));
 
 const publicUrlForKey = key => `${publicBaseUrl()}/${key}`;
 
@@ -136,6 +139,28 @@ const uploadToiletPhotos = async ({ userId, files = [] }) => {
   return urls;
 };
 
+const uploadProfilePhoto = async ({ userId, file }) => {
+  if (!file?.buffer) {
+    throw new HttpError(400, 'Add a profile photo');
+  }
+  const compressed = await compressImage(file.buffer);
+  const key = `profiles/${userId}/${crypto.randomUUID()}.jpg`;
+  try {
+    await getS3().send(
+      new PutObjectCommand({
+        Bucket: config.s3Bucket,
+        Key: key,
+        Body: compressed,
+        ContentType: 'image/jpeg',
+        CacheControl: 'public, max-age=31536000',
+      }),
+    );
+  } catch (error) {
+    throw mapS3Error(error);
+  }
+  return publicUrlForKey(key);
+};
+
 const deletePhotoUrls = async urls => {
   const keys = [...new Set((urls || []).map(photoKeyFromUrl).filter(Boolean))];
   if (!keys.length || !isS3Configured()) return;
@@ -164,14 +189,31 @@ const normalizePhotoList = (photos, { required = false } = {}) => {
   return rewritePhotoList(list);
 };
 
+const normalizeProfilePhotoUrl = (value, { allowEmpty = true } = {}) => {
+  if (value == null) return undefined;
+  const photoUrl = String(value).trim();
+  if (!photoUrl) {
+    if (!allowEmpty) throw new HttpError(400, 'Add a profile photo');
+    return '';
+  }
+  if (!isStoredProfilePhotoUrl(photoUrl)) {
+    throw new HttpError(400, 'Photo must be uploaded through this app');
+  }
+  return rewritePublicPhotoUrl(photoUrl);
+};
+
 module.exports = {
   MAX_PHOTOS,
   isS3Configured,
   isPlaceholderPhoto,
   isStoredPhotoUrl,
+  isStoredProfilePhotoUrl,
   uploadToiletPhotos,
+  uploadProfilePhoto,
   deletePhotoUrls,
   normalizePhotoList,
+  normalizeProfilePhotoUrl,
   rewritePhotoList,
+  rewritePublicPhotoUrl,
   removedPhotoUrls,
 };

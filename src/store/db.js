@@ -42,6 +42,7 @@ const mapUser = row => ({
   phone: row.phone,
   name: row.name || '',
   city: row.city || '',
+  photoUrl: row.photo_url || '',
   profileCompleted: Boolean(row.profile_completed),
   favoriteToiletIds: parseFavoriteIds(row.favorite_toilet_ids),
   blocked: Boolean(row.blocked),
@@ -114,14 +115,15 @@ const persistToPostgres = async db => {
     for (const user of db.users) {
       await client.query(
         `INSERT INTO users (
-            id, phone, name, city, profile_completed, favorite_toilet_ids,
+            id, phone, name, city, photo_url, profile_completed, favorite_toilet_ids,
             blocked, blocked_at, blocked_reason, device_token, device_token_updated_at, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, NOW())
           ON CONFLICT (id) DO UPDATE SET
             phone = EXCLUDED.phone,
             name = EXCLUDED.name,
             city = EXCLUDED.city,
+            photo_url = EXCLUDED.photo_url,
             profile_completed = EXCLUDED.profile_completed,
             favorite_toilet_ids = EXCLUDED.favorite_toilet_ids,
             blocked = EXCLUDED.blocked,
@@ -135,6 +137,7 @@ const persistToPostgres = async db => {
           user.phone,
           user.name || '',
           user.city || '',
+          user.photoUrl || '',
           Boolean(user.profileCompleted),
           JSON.stringify(user.favoriteToiletIds || []),
           Boolean(user.blocked),

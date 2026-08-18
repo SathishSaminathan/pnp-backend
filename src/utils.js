@@ -8,18 +8,27 @@ class HttpError extends Error {
 
 const normalizePhone = value => String(value || '').replace(/\D/g, '').slice(-10);
 
-const publicUser = user => ({
-  id: user.id,
-  phone: user.phone,
-  name: user.name,
-  city: user.city,
-  profileCompleted: Boolean(user.profileCompleted),
-  favoriteToiletIds: user.favoriteToiletIds || [],
-  blocked: Boolean(user.blocked),
-  blockedAt: user.blockedAt || null,
-  blockedReason: user.blockedReason || '',
-  hasDeviceToken: Boolean(user.deviceToken),
-});
+const publicUser = user => {
+  let photoUrl = String(user.photoUrl || '').trim();
+  try {
+    photoUrl = require('./services/uploads').rewritePublicPhotoUrl(photoUrl) || '';
+  } catch {
+    photoUrl = String(user.photoUrl || '').trim();
+  }
+  return {
+    id: user.id,
+    phone: user.phone,
+    name: user.name,
+    city: user.city,
+    photoUrl,
+    profileCompleted: Boolean(user.profileCompleted),
+    favoriteToiletIds: user.favoriteToiletIds || [],
+    blocked: Boolean(user.blocked),
+    blockedAt: user.blockedAt || null,
+    blockedReason: user.blockedReason || '',
+    hasDeviceToken: Boolean(user.deviceToken),
+  };
+};
 
 const isBlocked = user => Boolean(user?.blocked);
 

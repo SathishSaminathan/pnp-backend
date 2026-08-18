@@ -82,4 +82,25 @@ const parseToiletPhotos = (req, res, next) => {
   });
 };
 
-module.exports = { photoUpload, parseToiletPhotos, collectPhotoFiles };
+const parseProfilePhoto = (req, res, next) => {
+  if (req.body && Array.isArray(req.body._parts)) {
+    next(
+      new HttpError(
+        400,
+        'Photo must be sent as multipart/form-data with field name "photo", not JSON. Do not set Content-Type manually.',
+      ),
+    );
+    return;
+  }
+
+  photoUpload.single('photo')(req, res, err => {
+    if (err) {
+      next(err);
+      return;
+    }
+    req.files = req.file ? [req.file] : [];
+    next();
+  });
+};
+
+module.exports = { photoUpload, parseToiletPhotos, parseProfilePhoto, collectPhotoFiles };
