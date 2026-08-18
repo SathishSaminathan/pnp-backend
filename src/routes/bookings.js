@@ -1,5 +1,6 @@
 const express = require('express');
 const { BOOKING_STATUS } = require('../constants');
+const { publicBooking } = require('../services/payments');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { mapToilet } = require('../services/toilets');
@@ -11,7 +12,10 @@ const router = express.Router();
 router.get('/', (req, res) => {
   const status = req.query.status;
   const db = readDb();
-  const items = db.bookings.filter(item => item.userId === req.user.id && (!status || item.bookingStatus === status));
+  const items = db.bookings
+    .filter(item => item.userId === req.user.id)
+    .map(publicBooking)
+    .filter(item => !status || item.bookingStatus === status);
   res.json(items);
 });
 
@@ -22,7 +26,7 @@ router.get('/:bookingId', (req, res, next) => {
     if (!booking) {
       throw new HttpError(404, 'Booking not found');
     }
-    res.json(booking);
+    res.json(publicBooking(booking));
   } catch (error) {
     next(error);
   }
@@ -52,7 +56,7 @@ router.post('/:bookingId/reviews', parseReviewPhotos, async (req, res, next) => 
     if (booking.userId !== req.user.id) {
       throw new HttpError(403, 'You can only review your own visits');
     }
-    if (booking.bookingStatus !== BOOKING_STATUS.COMPLETED) {
+    if (publicBooking(booking).bookingStatus !== BOOKING_STATUS.COMPLETED) {
       throw new HttpError(400, 'Only completed bookings can be reviewed');
     }
     if (booking.reviewSubmitted) {

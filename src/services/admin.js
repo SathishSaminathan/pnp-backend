@@ -1,5 +1,5 @@
 const { publicUser } = require('../utils');
-const { publicTransaction } = require('./payments');
+const { publicTransaction, publicBooking } = require('./payments');
 const { summarizeTransactions } = require('./earnings');
 const { rewritePhotoList } = require('./uploads');
 
@@ -103,7 +103,7 @@ const overview = db => {
     bookings: db.bookings.length,
     reviews: db.reviews.length,
     earnings: summarizeTransactions(txns, { toilets: db.toilets, bookings: db.bookings }),
-    recentBookings: db.bookings.slice(0, 8),
+    recentBookings: db.bookings.map(publicBooking).slice(0, 8),
     recentTransactions: txns.slice(0, 8),
   };
 };

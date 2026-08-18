@@ -26,4 +26,14 @@ const publicTransaction = item => {
   };
 };
 
-module.exports = { saveQuote, getQuote, saveOrder, getOrder, publicTransaction };
+const publicBooking = item => {
+  const paymentFailed = isFailedMoneyStatus(item.paymentStatus);
+  const cancelled = String(item.bookingStatus || '').toUpperCase() === 'CANCELLED';
+  return {
+    ...item,
+    paymentStatus: paymentFailed ? 'FAILED' : 'PAID',
+    bookingStatus: cancelled ? 'CANCELLED' : paymentFailed ? 'CANCELLED' : 'COMPLETED',
+  };
+};
+
+module.exports = { saveQuote, getQuote, saveOrder, getOrder, publicTransaction, publicBooking };

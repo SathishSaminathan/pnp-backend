@@ -4,7 +4,7 @@ const { HttpError, publicUser } = require('../utils');
 const { readDb, updateDb } = require('../store/db');
 const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../middleware/auth');
 const { ownerIds, enrichUser, enrichOwner, overview, mapAdminListing, applyListingVerified } = require('../services/admin');
-const { publicTransaction } = require('../services/payments');
+const { publicTransaction, publicBooking } = require('../services/payments');
 const { listFavoriteToilets } = require('../services/favorites');
 const { rewritePhotoList, mapReview } = require('../services/uploads');
 const { adminMaster, assertKey, normalizeItem } = require('../services/master');
@@ -166,7 +166,7 @@ router.get('/users/:userId', (req, res, next) => {
     if (!user) throw new HttpError(404, 'User not found');
     res.json({
       ...enrichUser(user, db),
-      bookings: db.bookings.filter(item => item.userId === user.id),
+      bookings: db.bookings.filter(item => item.userId === user.id).map(publicBooking),
       favorites: listFavoriteToilets(db, user),
       toilets: db.toilets
         .filter(item => item.ownerId === user.id)
@@ -260,6 +260,7 @@ router.get('/bookings', (req, res) => {
   const db = readDb();
   const status = req.query.status;
   const items = db.bookings
+    .map(publicBooking)
     .filter(item => (!status ? true : item.bookingStatus === status))
     .map(booking => ({
       ...booking,

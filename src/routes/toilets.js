@@ -1,5 +1,6 @@
 const express = require('express');
 const { HttpError } = require('../utils');
+const { publicBooking } = require('../services/payments');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters, sanitizeOwnerToiletPayload } = require('../services/toilets');
 const { facilityValues } = require('../services/master');
@@ -51,7 +52,7 @@ router.post('/photos', parseToiletPhotos, async (req, res, next) => {
 router.get('/:toiletId/bookings', (req, res) => {
   const db = readDb();
   getToiletOrThrow(db, req.params.toiletId);
-  res.json(db.bookings.filter(item => item.toiletId === req.params.toiletId));
+  res.json(db.bookings.filter(item => item.toiletId === req.params.toiletId).map(publicBooking));
 });
 
 router.patch('/:toiletId/enabled', (req, res, next) => {
