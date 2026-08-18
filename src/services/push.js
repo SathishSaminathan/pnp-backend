@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const admin = require('firebase-admin');
+const { cert, getApps, initializeApp } = require('firebase-admin/app');
+const { getMessaging: getFirebaseMessaging } = require('firebase-admin/messaging');
 const config = require('../config');
 const { readDb, updateDb } = require('../store/db');
 const { setUserDeviceToken } = require('./users');
@@ -11,7 +12,8 @@ const INVALID_TOKEN_CODES = new Set([
   'messaging/invalid-argument',
 ]);
 
-let app = null;
+let messagingClient = null;
+let initError = null;
 
 const resolveServiceAccountPath = () => {
   const fromEnv = config.firebaseServiceAccountPath;
@@ -21,34 +23,79 @@ const resolveServiceAccountPath = () => {
   return path.resolve(__dirname, '../../secrets/firebase-adminsdk.json');
 };
 
+const parseJsonMaybe = raw => {
+  if (!raw) return null;
+  if (typeof raw === 'object') return raw;
+  const text = String(raw).trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+  } catch (error) {
+    throw new Error(`FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON: ${error.message}`);
+  }
+};
+
+const normalizeServiceAccount = raw => {
+  const parsed = parseJsonMaybe(raw);
+  if (!parsed || typeof parsed !== 'object') return null;
+  const privateKey = String(parsed.private_key || parsed.privateKey || '').replace(/\\n/g, '\n');
+  const clientEmail = String(parsed.client_email || parsed.clientEmail || '').trim();
+  const projectId = String(parsed.project_id || parsed.projectId || '').trim();
+  if (!privateKey || !clientEmail) {
+    throw new Error('Firebase service account is missing private_key or client_email');
+  }
+  return {
+    ...parsed,
+    type: parsed.type || 'service_account',
+    project_id: projectId,
+    client_email: clientEmail,
+    private_key: privateKey,
+  };
+};
+
 const loadServiceAccount = () => {
   if (config.firebaseServiceAccountJson) {
-    return JSON.parse(config.firebaseServiceAccountJson);
+    return normalizeServiceAccount(config.firebaseServiceAccountJson);
   }
   const filePath = resolveServiceAccountPath();
   if (!fs.existsSync(filePath)) {
     return null;
   }
-  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  return normalizeServiceAccount(fs.readFileSync(filePath, 'utf8'));
 };
 
 const getMessaging = () => {
-  if (app) {
-    return admin.messaging(app);
-  }
-  if (admin.apps.length) {
-    app = admin.app();
-    return admin.messaging(app);
-  }
-  const serviceAccount = loadServiceAccount();
-  if (!serviceAccount) {
+  if (messagingClient) return messagingClient;
+  if (initError) return null;
+
+  try {
+    const existing = getApps();
+    if (existing.length) {
+      messagingClient = getFirebaseMessaging(existing[0]);
+      return messagingClient;
+    }
+
+    const serviceAccount = loadServiceAccount();
+    if (!serviceAccount) {
+      initError = 'missing_firebase_admin';
+      console.warn(
+        'Push: Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_JSON on Railway, or FIREBASE_SERVICE_ACCOUNT_PATH locally.',
+      );
+      return null;
+    }
+
+    const app = initializeApp({
+      credential: cert(serviceAccount),
+      projectId: serviceAccount.project_id,
+    });
+    messagingClient = getFirebaseMessaging(app);
+    return messagingClient;
+  } catch (error) {
+    initError = error.message || 'firebase_init_failed';
+    console.warn('Push: Firebase Admin failed to initialize', initError);
     return null;
   }
-  app = admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    projectId: serviceAccount.project_id,
-  });
-  return admin.messaging(app);
 };
 
 const stringifyData = data => {
@@ -103,10 +150,7 @@ const sendToToken = async (token, payload = {}) => {
 
   const messaging = getMessaging();
   if (!messaging) {
-    console.warn(
-      'Push: Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON',
-    );
-    return { skipped: true, reason: 'missing_firebase_admin' };
+    return { skipped: true, reason: initError || 'missing_firebase_admin' };
   }
 
   try {
@@ -133,10 +177,7 @@ const sendToTopic = async (topic, payload = {}) => {
 
   const messaging = getMessaging();
   if (!messaging) {
-    console.warn(
-      'Push: Firebase Admin is not configured. Set FIREBASE_SERVICE_ACCOUNT_PATH or FIREBASE_SERVICE_ACCOUNT_JSON',
-    );
-    return { skipped: true, reason: 'missing_firebase_admin' };
+    return { skipped: true, reason: initError || 'missing_firebase_admin' };
   }
 
   try {
@@ -163,7 +204,7 @@ const sendPushToUser = async (user, payload) => {
 };
 
 const sendPushToUserId = async (userId, payload) => {
-  const user = readDb().users.find(item => item.id === userId);
+  const user = (readDb().users || []).find(item => item.id === userId);
   if (!user) {
     return { skipped: true, reason: 'user_not_found' };
   }
