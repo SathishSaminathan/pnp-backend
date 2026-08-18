@@ -36,6 +36,7 @@ const enrichOwner = (user, db) => {
       city: item.address?.city,
       area: item.address?.area,
       address: item.address,
+      photos: item.photos || [],
     })),
     hostBookingCount: bookings.length,
     settledAmount: txns.filter(item => item.settlementStatus === 'SETTLED').reduce((sum, item) => sum + Number(item.netAmount || 0), 0),
