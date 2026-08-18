@@ -29,10 +29,16 @@ const mapS3Error = error => {
       `S3 bucket region does not match AWS_REGION (${config.awsRegion}). Set AWS_REGION to the bucket's region.`,
     );
   }
-  if (name === 'InvalidAccessKeyId' || name === 'SignatureDoesNotMatch' || name === 'AccessDenied') {
+  if (name === 'InvalidAccessKeyId' || name === 'SignatureDoesNotMatch') {
     return new HttpError(
       503,
-      'S3 credentials were rejected. Check AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and bucket IAM permissions.',
+      'S3 access keys are invalid. Check AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.',
+    );
+  }
+  if (name === 'AccessDenied') {
+    return new HttpError(
+      503,
+      'S3 access was denied. The IAM user needs s3:PutObject, s3:GetObject, and s3:DeleteObject on toilets/* and profiles/* in this bucket.',
     );
   }
   if (name === 'NoSuchBucket') {
