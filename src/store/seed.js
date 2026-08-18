@@ -40,6 +40,10 @@ const createSeed = () => {
       facilities: 5,
       valueForMoney: 4,
       comment: 'Clean, bright, and easy to access from the metro exit.',
+      photos: [
+        'https://picsum.photos/seed/pnp-review-1a/800/500',
+        'https://picsum.photos/seed/pnp-review-1b/800/500',
+      ],
       createdAt: '2026-08-15T10:30:00.000Z',
     },
     {
@@ -53,6 +57,7 @@ const createSeed = () => {
       facilities: 4,
       valueForMoney: 5,
       comment: 'Affordable and available late into the night.',
+      photos: ['https://picsum.photos/seed/pnp-review-2a/800/500'],
       createdAt: '2026-08-12T12:00:00.000Z',
     },
   ];

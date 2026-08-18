@@ -6,7 +6,7 @@ const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../mi
 const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
 const { publicTransaction } = require('../services/payments');
 const { listFavoriteToilets } = require('../services/favorites');
-const { rewritePhotoList } = require('../services/uploads');
+const { rewritePhotoList, mapReview } = require('../services/uploads');
 const { adminMaster, assertKey, normalizeItem } = require('../services/master');
 const { sendPushToUser, sendPushToUserId, sendToToken, sendToTopic } = require('../services/push');
 const { applyTemplate, listPublicTemplates } = require('../services/pushTemplates');
@@ -251,7 +251,7 @@ router.get('/transactions', (_req, res) => {
 router.get('/reviews', (_req, res) => {
   const db = readDb();
   const items = db.reviews.map(review => ({
-    ...review,
+    ...mapReview(review),
     toiletName: db.toilets.find(item => item.id === review.toiletId)?.name || '',
   }));
   res.json({ items, total: items.length });

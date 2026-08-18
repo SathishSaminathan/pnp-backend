@@ -5,6 +5,7 @@ const config = require('../config');
 const { HttpError } = require('../utils');
 
 const MAX_PHOTOS = 4;
+const MAX_REVIEW_PHOTOS = 3;
 const MAX_WIDTH = 1600;
 const JPEG_QUALITY = 80;
 
@@ -38,7 +39,7 @@ const mapS3Error = error => {
   if (name === 'AccessDenied') {
     return new HttpError(
       503,
-      'S3 access was denied. The IAM user needs s3:PutObject, s3:GetObject, and s3:DeleteObject on toilets/* and profiles/* in this bucket.',
+      'S3 access was denied. The IAM user needs s3:PutObject, s3:GetObject, and s3:DeleteObject on toilets/*, profiles/*, and reviews/* in this bucket.',
     );
   }
   if (name === 'NoSuchBucket') {
@@ -72,7 +73,7 @@ const photoKeyFromUrl = (url, prefix = '') => {
     if (config.s3Bucket && bucket !== config.s3Bucket) return null;
     const key = decodeURIComponent(parsed.pathname.replace(/^\//, ''));
     if (prefix) return key.startsWith(prefix) ? key : null;
-    if (key.startsWith('toilets/') || key.startsWith('profiles/')) return key;
+    if (key.startsWith('toilets/') || key.startsWith('profiles/') || key.startsWith('reviews/')) return key;
     return null;
   } catch {
     return null;
@@ -81,6 +82,7 @@ const photoKeyFromUrl = (url, prefix = '') => {
 
 const isStoredPhotoUrl = url => Boolean(photoKeyFromUrl(url, 'toilets/'));
 const isStoredProfilePhotoUrl = url => Boolean(photoKeyFromUrl(url, 'profiles/'));
+const isStoredReviewPhotoUrl = url => Boolean(photoKeyFromUrl(url, 'reviews/'));
 
 const publicUrlForKey = key => `${publicBaseUrl()}/${key}`;
 
@@ -167,6 +169,37 @@ const uploadProfilePhoto = async ({ userId, file }) => {
   return publicUrlForKey(key);
 };
 
+const uploadReviewPhotos = async ({ userId, files = [] }) => {
+  if (files.length > MAX_REVIEW_PHOTOS) {
+    throw new HttpError(400, `You can upload up to ${MAX_REVIEW_PHOTOS} photos`);
+  }
+  if (!files.length) return [];
+
+  const client = getS3();
+  const urls = [];
+
+  for (const file of files) {
+    const compressed = await compressImage(file.buffer);
+    const key = `reviews/${userId}/${crypto.randomUUID()}.jpg`;
+    try {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: config.s3Bucket,
+          Key: key,
+          Body: compressed,
+          ContentType: 'image/jpeg',
+          CacheControl: 'public, max-age=31536000',
+        }),
+      );
+    } catch (error) {
+      throw mapS3Error(error);
+    }
+    urls.push(publicUrlForKey(key));
+  }
+
+  return urls;
+};
+
 const deletePhotoUrls = async urls => {
   const keys = [...new Set((urls || []).map(photoKeyFromUrl).filter(Boolean))];
   if (!keys.length || !isS3Configured()) return;
@@ -195,6 +228,26 @@ const normalizePhotoList = (photos, { required = false } = {}) => {
   return rewritePhotoList(list);
 };
 
+const normalizeReviewPhotoList = (photos, { required = false } = {}) => {
+  const list = Array.isArray(photos) ? photos.map(item => String(item || '').trim()).filter(Boolean) : [];
+  if (required && !list.length) {
+    throw new HttpError(400, 'Add at least one photo');
+  }
+  if (list.length > MAX_REVIEW_PHOTOS) {
+    throw new HttpError(400, `You can add up to ${MAX_REVIEW_PHOTOS} photos`);
+  }
+  const invalid = list.filter(url => !isStoredReviewPhotoUrl(url) && !isPlaceholderPhoto(url));
+  if (invalid.length) {
+    throw new HttpError(400, 'Review photos must be uploaded through this app');
+  }
+  return rewritePhotoList(list);
+};
+
+const mapReview = review => ({
+  ...review,
+  photos: rewritePhotoList(review?.photos || []),
+});
+
 const normalizeProfilePhotoUrl = (value, { allowEmpty = true } = {}) => {
   if (value == null) return undefined;
   const photoUrl = String(value).trim();
@@ -210,15 +263,20 @@ const normalizeProfilePhotoUrl = (value, { allowEmpty = true } = {}) => {
 
 module.exports = {
   MAX_PHOTOS,
+  MAX_REVIEW_PHOTOS,
   isS3Configured,
   isPlaceholderPhoto,
   isStoredPhotoUrl,
   isStoredProfilePhotoUrl,
+  isStoredReviewPhotoUrl,
   uploadToiletPhotos,
   uploadProfilePhoto,
+  uploadReviewPhotos,
   deletePhotoUrls,
   normalizePhotoList,
+  normalizeReviewPhotoList,
   normalizeProfilePhotoUrl,
+  mapReview,
   rewritePhotoList,
   rewritePublicPhotoUrl,
   removedPhotoUrls,

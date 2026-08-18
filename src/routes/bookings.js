@@ -3,6 +3,8 @@ const { BOOKING_STATUS } = require('../constants');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { mapToilet } = require('../services/toilets');
+const { parseReviewPhotos } = require('../middleware/upload');
+const { mapReview, normalizeReviewPhotoList, uploadReviewPhotos } = require('../services/uploads');
 
 const router = express.Router();
 
@@ -26,7 +28,19 @@ router.get('/:bookingId', (req, res, next) => {
   }
 });
 
-router.post('/:bookingId/reviews', (req, res, next) => {
+const parseJsonField = value => {
+  if (Array.isArray(value) || (value && typeof value === 'object')) return value;
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (!trimmed) return value;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return value;
+  }
+};
+
+router.post('/:bookingId/reviews', parseReviewPhotos, async (req, res, next) => {
   try {
     const payload = req.body || {};
     const db = readDb();
@@ -50,6 +64,11 @@ router.post('/:bookingId/reviews', (req, res, next) => {
     const safety = Number(payload.safety || 0);
     const facilities = Number(payload.facilities || 0);
     const valueForMoney = Number(payload.valueForMoney || 0);
+    const highlights = parseJsonField(payload.highlights) || [];
+    const uploadedFiles = req.files || [];
+    const photos = uploadedFiles.length
+      ? await uploadReviewPhotos({ userId: req.user.id, files: uploadedFiles })
+      : normalizeReviewPhotoList(parseJsonField(payload.photos) || [], { required: false });
 
     const review = {
       id: nextId('review'),
@@ -62,7 +81,8 @@ router.post('/:bookingId/reviews', (req, res, next) => {
       facilities,
       valueForMoney,
       comment: String(payload.comment || '').trim(),
-      highlights: payload.highlights || [],
+      highlights: Array.isArray(highlights) ? highlights : [],
+      photos,
       createdAt: new Date().toISOString(),
     };
 
@@ -91,7 +111,7 @@ router.post('/:bookingId/reviews', (req, res, next) => {
     });
 
     res.status(201).json({
-      review,
+      review: mapReview(review),
       booking: updatedBooking,
       toilet: mapToilet(toilet, req.user, readDb().reviews),
     });

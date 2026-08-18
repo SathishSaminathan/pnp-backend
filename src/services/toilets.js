@@ -23,7 +23,9 @@ const mapToilet = (toilet, user, reviews, origin, options = {}) => {
     photos: rewritePhotoList(toilet.photos),
   };
   if (options.includeReviews) {
-    mapped.reviews = (reviews || []).filter(review => review.toiletId === toilet.id);
+    mapped.reviews = (reviews || [])
+      .filter(review => review.toiletId === toilet.id)
+      .map(review => ({ ...review, photos: rewritePhotoList(review.photos || []) }));
   }
   return mapped;
 };

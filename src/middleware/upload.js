@@ -35,19 +35,27 @@ const isAllowedImage = file => {
   return false;
 };
 
+const imageFileFilter = (_req, file, cb) => {
+  if (!isAllowedImage(file)) {
+    cb(new HttpError(400, 'Only JPEG, PNG, WebP, or HEIC images are allowed'));
+    return;
+  }
+  if (!file.mimetype || file.mimetype === 'application/octet-stream') {
+    file.mimetype = mimeFromName(file.originalname) || 'image/jpeg';
+  }
+  cb(null, true);
+};
+
 const photoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024, files: 4 },
-  fileFilter: (_req, file, cb) => {
-    if (!isAllowedImage(file)) {
-      cb(new HttpError(400, 'Only JPEG, PNG, WebP, or HEIC images are allowed'));
-      return;
-    }
-    if (!file.mimetype || file.mimetype === 'application/octet-stream') {
-      file.mimetype = mimeFromName(file.originalname) || 'image/jpeg';
-    }
-    cb(null, true);
-  },
+  fileFilter: imageFileFilter,
+});
+
+const reviewPhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 3 },
+  fileFilter: imageFileFilter,
 });
 
 const collectPhotoFiles = req => {
@@ -103,4 +111,27 @@ const parseProfilePhoto = (req, res, next) => {
   });
 };
 
-module.exports = { photoUpload, parseToiletPhotos, parseProfilePhoto, collectPhotoFiles };
+const isMultipart = req => /multipart\/form-data/i.test(String(req.headers['content-type'] || ''));
+
+const parseReviewPhotos = (req, res, next) => {
+  if (!isMultipart(req)) {
+    req.files = [];
+    next();
+    return;
+  }
+
+  reviewPhotoUpload.any()(req, res, err => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        next(new HttpError(400, 'You can upload up to 3 review photos'));
+        return;
+      }
+      next(err);
+      return;
+    }
+    req.files = collectPhotoFiles(req).slice(0, 3);
+    next();
+  });
+};
+
+module.exports = { photoUpload, parseToiletPhotos, parseProfilePhoto, parseReviewPhotos, collectPhotoFiles };

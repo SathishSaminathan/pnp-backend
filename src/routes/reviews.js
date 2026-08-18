@@ -1,5 +1,6 @@
 const express = require('express');
 const { readDb } = require('../store/db');
+const { mapReview } = require('../services/uploads');
 
 const router = express.Router();
 
@@ -9,7 +10,7 @@ router.get('/', (req, res) => {
   const items = db.reviews
     .filter(review => (!toiletId ? true : review.toiletId === toiletId))
     .map(review => ({
-      ...review,
+      ...mapReview(review),
       toiletName: db.toilets.find(item => item.id === review.toiletId)?.name || '',
     }));
   res.json(items);

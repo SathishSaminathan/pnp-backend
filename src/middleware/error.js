@@ -7,7 +7,7 @@ const notFound = (req, _res, next) => {
 const multerMessage = err => {
   if (err.code === 'LIMIT_FILE_SIZE') return 'Each photo must be under 8 MB';
   if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
-    return 'You can upload up to 4 photos';
+    return 'Too many photos attached';
   }
   return err.message || 'Could not upload photos';
 };
