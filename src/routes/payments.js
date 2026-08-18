@@ -106,6 +106,7 @@ router.post('/verify', (req, res, next) => {
       id: nextId('txn'),
       ownerId: toilet.ownerId,
       bookingId: booking.id,
+      toiletId: quote.toiletId,
       toiletName: quote.toiletName,
       grossAmount: quote.totalAmount,
       platformFee,
@@ -113,6 +114,7 @@ router.post('/verify', (req, res, next) => {
       netAmount: Number(quote.totalAmount) - platformFee - taxAmount,
       paymentStatus: PAYMENT_STATUS.PAID,
       settlementStatus: SETTLEMENT_STATUS.SETTLED,
+      createdAt: new Date().toISOString(),
     };
 
     updateDb(current => {

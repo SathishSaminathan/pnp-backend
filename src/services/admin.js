@@ -1,5 +1,6 @@
 const { publicUser } = require('../utils');
 const { publicTransaction } = require('./payments');
+const { summarizeTransactions } = require('./earnings');
 
 const ownerIds = db => new Set(db.toilets.map(item => item.ownerId));
 
@@ -13,7 +14,7 @@ const enrichUser = (user, db) => {
     listingCount: toilets.length,
     bookingCount: bookings.length,
     favoriteCount: (user.favoriteToiletIds || []).length,
-    earningsNet: ownerTxns.reduce((sum, item) => sum + Number(item.netAmount || 0), 0),
+    earningsNet: ownerTxns.map(publicTransaction).reduce((sum, item) => sum + Number(item.netAmount || 0), 0),
   };
 };
 
@@ -44,12 +45,6 @@ const enrichOwner = (user, db) => {
 const overview = db => {
   const owners = ownerIds(db);
   const txns = db.transactions.map(publicTransaction);
-  const gross = txns.reduce((sum, item) => sum + Number(item.grossAmount || 0), 0);
-  const fees = txns.reduce((sum, item) => sum + Number(item.platformFee || 0), 0);
-  const net = txns.reduce((sum, item) => sum + Number(item.netAmount || 0), 0);
-  const settled = txns
-    .filter(item => item.settlementStatus === 'SETTLED')
-    .reduce((sum, item) => sum + Number(item.netAmount || 0), 0);
 
   return {
     users: db.users.length,
@@ -58,16 +53,7 @@ const overview = db => {
     listings: db.toilets.length,
     bookings: db.bookings.length,
     reviews: db.reviews.length,
-    earnings: {
-      today: 420,
-      week: 2680,
-      month: 10840,
-      total: 84220 + net,
-      gross,
-      fees,
-      net,
-      settled,
-    },
+    earnings: summarizeTransactions(txns, { toilets: db.toilets, bookings: db.bookings }),
     recentBookings: db.bookings.slice(0, 8),
     recentTransactions: txns.slice(0, 8),
   };

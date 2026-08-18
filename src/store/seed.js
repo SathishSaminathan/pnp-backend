@@ -207,6 +207,7 @@ const createSeed = () => {
       id: 'txn_001',
       ownerId: 'user_001',
       bookingId: 'booking_001',
+      toiletId: 'toilet_001',
       toiletName: 'Central Metro Comfort Hub',
       grossAmount: 35,
       platformFee: 5,
@@ -214,11 +215,13 @@ const createSeed = () => {
       netAmount: 28,
       settlementStatus: 'SETTLED',
       paymentStatus: 'PAID',
+      createdAt: '2026-08-19T09:30:00.000Z',
     },
     {
       id: 'txn_002',
       ownerId: 'user_provider_002',
       bookingId: 'booking_002',
+      toiletId: 'toilet_002',
       toiletName: 'Marina Seaside Wash Point',
       grossAmount: 20,
       platformFee: 4,
@@ -226,6 +229,7 @@ const createSeed = () => {
       netAmount: 15,
       settlementStatus: 'SETTLED',
       paymentStatus: 'PAID',
+      createdAt: '2026-08-16T19:30:00.000Z',
     },
   ];
 
