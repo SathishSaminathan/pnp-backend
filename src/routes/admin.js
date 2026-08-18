@@ -4,6 +4,7 @@ const { HttpError, publicUser } = require('../utils');
 const { readDb, updateDb } = require('../store/db');
 const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../middleware/auth');
 const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
+const { publicTransaction } = require('../services/payments');
 const { listFavoriteToilets } = require('../services/favorites');
 const { adminMaster, assertKey, normalizeItem } = require('../services/master');
 const { sendPushToUser, sendPushToUserId, sendToToken, sendToTopic } = require('../services/push');
@@ -237,7 +238,7 @@ router.get('/earnings', (_req, res) => {
 router.get('/transactions', (_req, res) => {
   const db = readDb();
   const items = db.transactions.map(txn => ({
-    ...txn,
+    ...publicTransaction(txn),
     owner: publicUser(db.users.find(user => user.id === txn.ownerId) || { id: txn.ownerId, phone: '', name: 'Unknown', city: '', profileCompleted: false, favoriteToiletIds: [] }),
   }));
   res.json({ items, total: items.length });

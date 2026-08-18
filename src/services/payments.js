@@ -15,4 +15,15 @@ const saveOrder = order => {
 
 const getOrder = orderId => orders.get(orderId);
 
-module.exports = { saveQuote, getQuote, saveOrder, getOrder };
+const isFailedMoneyStatus = value => String(value || '').toUpperCase() === 'FAILED';
+
+const publicTransaction = item => {
+  const failed = isFailedMoneyStatus(item.paymentStatus) || isFailedMoneyStatus(item.settlementStatus);
+  return {
+    ...item,
+    paymentStatus: failed ? 'FAILED' : 'PAID',
+    settlementStatus: failed ? 'FAILED' : 'SETTLED',
+  };
+};
+
+module.exports = { saveQuote, getQuote, saveOrder, getOrder, publicTransaction };

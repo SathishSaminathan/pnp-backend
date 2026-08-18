@@ -1,4 +1,5 @@
 const { publicUser } = require('../utils');
+const { publicTransaction } = require('./payments');
 
 const ownerIds = db => new Set(db.toilets.map(item => item.ownerId));
 
@@ -19,7 +20,7 @@ const enrichUser = (user, db) => {
 const enrichOwner = (user, db) => {
   const toilets = db.toilets.filter(item => item.ownerId === user.id);
   const bookings = db.bookings.filter(item => toilets.some(toilet => toilet.id === item.toiletId));
-  const txns = db.transactions.filter(item => item.ownerId === user.id);
+  const txns = db.transactions.filter(item => item.ownerId === user.id).map(publicTransaction);
   return {
     ...enrichUser(user, db),
     listings: toilets.map(item => ({
@@ -37,19 +38,18 @@ const enrichOwner = (user, db) => {
     })),
     hostBookingCount: bookings.length,
     settledAmount: txns.filter(item => item.settlementStatus === 'SETTLED').reduce((sum, item) => sum + Number(item.netAmount || 0), 0),
-    pendingAmount: txns.filter(item => item.settlementStatus !== 'SETTLED').reduce((sum, item) => sum + Number(item.netAmount || 0), 0),
   };
 };
 
 const overview = db => {
   const owners = ownerIds(db);
-  const gross = db.transactions.reduce((sum, item) => sum + Number(item.grossAmount || 0), 0);
-  const fees = db.transactions.reduce((sum, item) => sum + Number(item.platformFee || 0), 0);
-  const net = db.transactions.reduce((sum, item) => sum + Number(item.netAmount || 0), 0);
-  const pending = db.transactions
-    .filter(item => item.settlementStatus !== 'SETTLED')
+  const txns = db.transactions.map(publicTransaction);
+  const gross = txns.reduce((sum, item) => sum + Number(item.grossAmount || 0), 0);
+  const fees = txns.reduce((sum, item) => sum + Number(item.platformFee || 0), 0);
+  const net = txns.reduce((sum, item) => sum + Number(item.netAmount || 0), 0);
+  const settled = txns
+    .filter(item => item.settlementStatus === 'SETTLED')
     .reduce((sum, item) => sum + Number(item.netAmount || 0), 0);
-  const settled = net - pending;
 
   return {
     users: db.users.length,
@@ -66,11 +66,10 @@ const overview = db => {
       gross,
       fees,
       net,
-      pending,
       settled,
     },
     recentBookings: db.bookings.slice(0, 8),
-    recentTransactions: db.transactions.slice(0, 8),
+    recentTransactions: txns.slice(0, 8),
   };
 };
 

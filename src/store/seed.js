@@ -165,7 +165,7 @@ const createSeed = () => {
       duration: 'Per use',
       amount: 35,
       paymentStatus: 'PAID',
-      bookingStatus: BOOKING_STATUS.UPCOMING,
+      bookingStatus: BOOKING_STATUS.COMPLETED,
       reviewSubmitted: false,
     },
     {
@@ -213,6 +213,7 @@ const createSeed = () => {
       taxAmount: 2,
       netAmount: 28,
       settlementStatus: 'SETTLED',
+      paymentStatus: 'PAID',
     },
     {
       id: 'txn_002',
@@ -223,7 +224,8 @@ const createSeed = () => {
       platformFee: 4,
       taxAmount: 1,
       netAmount: 15,
-      settlementStatus: 'PENDING',
+      settlementStatus: 'SETTLED',
+      paymentStatus: 'PAID',
     },
   ];
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const config = require('../config');
-const { BOOKING_STATUS } = require('../constants');
+const { BOOKING_STATUS, PAYMENT_STATUS, SETTLEMENT_STATUS } = require('../constants');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { saveQuote, getQuote, saveOrder, getOrder } = require('../services/payments');
@@ -95,8 +95,8 @@ router.post('/verify', (req, res, next) => {
       time: quote.time,
       duration: quote.duration || 'Per use',
       amount: quote.totalAmount,
-      paymentStatus: 'PAID',
-      bookingStatus: BOOKING_STATUS.UPCOMING,
+      paymentStatus: PAYMENT_STATUS.PAID,
+      bookingStatus: BOOKING_STATUS.COMPLETED,
       reviewSubmitted: false,
     };
 
@@ -111,7 +111,8 @@ router.post('/verify', (req, res, next) => {
       platformFee,
       taxAmount,
       netAmount: Number(quote.totalAmount) - platformFee - taxAmount,
-      settlementStatus: 'PENDING',
+      paymentStatus: PAYMENT_STATUS.PAID,
+      settlementStatus: SETTLEMENT_STATUS.SETTLED,
     };
 
     updateDb(current => {

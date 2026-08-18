@@ -5,6 +5,16 @@ const BOOKING_STATUS = {
   CANCELLED: 'CANCELLED',
 };
 
+const PAYMENT_STATUS = {
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+};
+
+const SETTLEMENT_STATUS = {
+  SETTLED: 'SETTLED',
+  FAILED: 'FAILED',
+};
+
 const DISCOVERY_FILTER_DEFAULTS = {
   openNow: false,
   verifiedOnly: false,
@@ -59,6 +69,8 @@ const FACILITIES = createDefaultMaster().facilities.map(item => item.value);
 module.exports = {
   FACILITIES,
   BOOKING_STATUS,
+  PAYMENT_STATUS,
+  SETTLEMENT_STATUS,
   DISCOVERY_FILTER_DEFAULTS,
   createDefaultMaster,
 };

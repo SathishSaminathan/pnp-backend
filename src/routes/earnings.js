@@ -1,5 +1,6 @@
 const express = require('express');
 const { readDb } = require('../store/db');
+const { publicTransaction } = require('../services/payments');
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get('/', (req, res) => {
 
 router.get('/transactions', (req, res) => {
   const db = readDb();
-  res.json(db.transactions.filter(item => item.ownerId === req.user.id));
+  res.json(db.transactions.filter(item => item.ownerId === req.user.id).map(publicTransaction));
 });
 
 module.exports = router;
