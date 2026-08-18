@@ -4,7 +4,7 @@ const { readDb, updateDb, nextId } = require('../store/db');
 const { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
 const { facilityValues } = require('../services/master');
 const { listFavoriteToilets, toggleFavorite } = require('../services/favorites');
-const { photoUpload } = require('../middleware/upload');
+const { parseToiletPhotos } = require('../middleware/upload');
 const { deletePhotoUrls, normalizePhotoList, uploadToiletPhotos } = require('../services/uploads');
 
 const router = express.Router();
@@ -39,19 +39,13 @@ router.get('/favorites', (req, res) => {
   res.json(listFavoriteToilets(readDb(), req.user));
 });
 
-router.post('/photos', (req, res, next) => {
-  photoUpload.array('photos', 4)(req, res, async err => {
-    if (err) {
-      next(err);
-      return;
-    }
-    try {
-      const photos = await uploadToiletPhotos({ userId: req.user.id, files: req.files || [] });
-      res.status(201).json({ photos });
-    } catch (error) {
-      next(error);
-    }
-  });
+router.post('/photos', parseToiletPhotos, async (req, res, next) => {
+  try {
+    const photos = await uploadToiletPhotos({ userId: req.user.id, files: req.files || [] });
+    res.status(201).json({ photos });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get('/:toiletId/bookings', (req, res) => {
