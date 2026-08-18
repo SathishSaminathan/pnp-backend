@@ -4,6 +4,25 @@ const { publicMaster } = require('./master');
 const { isFavorite } = require('./favorites');
 const { rewritePhotoList } = require('./uploads');
 
+const OWNER_LOCKED_FIELDS = [
+  'id',
+  'ownerId',
+  'verified',
+  'verifiedAt',
+  'verifiedBy',
+  'verificationNotes',
+  'rating',
+  'reviewCount',
+];
+
+const sanitizeOwnerToiletPayload = payload => {
+  const next = { ...(payload || {}) };
+  OWNER_LOCKED_FIELDS.forEach(key => {
+    delete next[key];
+  });
+  return next;
+};
+
 const isToiletEnabled = toilet => toilet?.enabled !== false;
 
 const mapEnabledStatus = (toilet, enabled = isToiletEnabled(toilet)) => ({
@@ -17,6 +36,7 @@ const mapToilet = (toilet, user, reviews, origin, options = {}) => {
   const mapped = {
     ...toilet,
     enabled: isToiletEnabled(toilet),
+    verified: Boolean(toilet.verified),
     isOwner: Boolean(user?.id && toilet.ownerId === user.id),
     isFavorite: isFavorite(user, toilet.id),
     distanceKm: computedKm == null ? Number(toilet.distanceKm || 0) : roundKm(computedKm),
@@ -178,4 +198,4 @@ const discoveryFilters = db => {
   };
 };
 
-module.exports = { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters };
+module.exports = { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters, sanitizeOwnerToiletPayload };

@@ -3,7 +3,7 @@ const config = require('../config');
 const { HttpError, publicUser } = require('../utils');
 const { readDb, updateDb } = require('../store/db');
 const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../middleware/auth');
-const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
+const { ownerIds, enrichUser, enrichOwner, overview, mapAdminListing, applyListingVerified } = require('../services/admin');
 const { publicTransaction } = require('../services/payments');
 const { listFavoriteToilets } = require('../services/favorites');
 const { rewritePhotoList, mapReview } = require('../services/uploads');
@@ -195,24 +195,14 @@ router.get('/listings', (req, res) => {
   const db = readDb();
   const ownerId = req.query.ownerId;
   const search = String(req.query.search || '').trim().toLowerCase();
+  const verifiedFilter = String(req.query.verified || '').trim().toLowerCase();
   const items = db.toilets
     .filter(item => (!ownerId ? true : item.ownerId === ownerId))
-    .map(toilet => {
-      const owner = db.users.find(user => user.id === toilet.ownerId) || {
-        id: toilet.ownerId,
-        phone: '',
-        name: 'Unknown',
-        city: '',
-        profileCompleted: false,
-        favoriteToiletIds: [],
-      };
-      return {
-        ...toilet,
-        photos: rewritePhotoList(toilet.photos),
-        owner: publicUser(owner),
-        ownerBlocked: Boolean(owner.blocked),
-        bookingCount: db.bookings.filter(item => item.toiletId === toilet.id).length,
-      };
+    .map(toilet => mapAdminListing(toilet, db))
+    .filter(item => {
+      if (verifiedFilter === 'true' || verifiedFilter === 'verified') return item.verified;
+      if (verifiedFilter === 'false' || verifiedFilter === 'pending' || verifiedFilter === 'unverified') return !item.verified;
+      return true;
     })
     .filter(item => {
       if (!search) return true;
@@ -221,6 +211,50 @@ router.get('/listings', (req, res) => {
     });
   res.json({ items, total: items.length });
 });
+
+const setListingVerified = async (req, res, next) => {
+  try {
+    if (typeof req.body?.verified !== 'boolean') {
+      throw new HttpError(400, 'verified must be a boolean');
+    }
+    const verified = req.body.verified;
+    const notes = String(req.body?.notes || req.body?.reason || '').trim();
+    let saved;
+    let owner;
+
+    updateDb(db => {
+      const toilet = db.toilets.find(item => item.id === req.params.toiletId);
+      if (!toilet) throw new HttpError(404, 'Toilet not found');
+      saved = applyListingVerified(toilet, { verified, admin: req.admin, notes });
+      owner = db.users.find(user => user.id === toilet.ownerId) || null;
+      db.toilets = db.toilets.map(item => (item.id === toilet.id ? saved : item));
+      return db;
+    });
+
+    const template = applyTemplate(verified ? 'listing_verified' : 'listing_unverified', {
+      name: owner?.name || 'there',
+      toiletName: saved.name || 'your listing',
+    });
+    const push = owner
+      ? await sendPushToUser(owner, {
+          title: template.title,
+          body: template.body,
+          data: { actionType: template.actionType, toiletId: saved.id },
+        })
+      : null;
+
+    res.json({
+      ...mapAdminListing(saved, readDb()),
+      push,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+router.patch('/listings/:toiletId/verified', setListingVerified);
+router.put('/listings/:toiletId/verified', setListingVerified);
+router.post('/listings/:toiletId/verified', setListingVerified);
 
 router.get('/bookings', (req, res) => {
   const db = readDb();

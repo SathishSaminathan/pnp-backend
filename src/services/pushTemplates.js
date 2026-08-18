@@ -74,6 +74,24 @@ const TEMPLATES = [
     title: 'Account restored',
     body: 'Hi {{name}}, your PNP account is active again. You can continue using the app.',
   },
+  {
+    id: 'listing_verified',
+    name: 'Listing verified',
+    description: 'Sent automatically when an admin approves a toilet listing',
+    audience: 'user',
+    actionType: 'CUSTOM',
+    title: 'Listing verified',
+    body: 'Hi {{name}}, {{toiletName}} is now a verified restroom on PNP.',
+  },
+  {
+    id: 'listing_unverified',
+    name: 'Listing verification removed',
+    description: 'Sent automatically when an admin removes verification from a listing',
+    audience: 'user',
+    actionType: 'CUSTOM',
+    title: 'Verification removed',
+    body: 'Hi {{name}}, verification was removed from {{toiletName}}. Contact support if you have questions.',
+  },
 ];
 
 const getTemplate = id => TEMPLATES.find(item => item.id === id) || null;

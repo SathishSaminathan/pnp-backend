@@ -28,7 +28,9 @@ const enrichOwner = (user, db) => {
     listings: toilets.map(item => ({
       id: item.id,
       name: item.name,
-      verified: item.verified,
+      verified: Boolean(item.verified),
+      verifiedAt: item.verifiedAt || null,
+      verifiedBy: item.verifiedBy || null,
       enabled: item.enabled !== false,
       availability: item.availability,
       basePrice: item.basePrice,
@@ -44,6 +46,39 @@ const enrichOwner = (user, db) => {
   };
 };
 
+const mapAdminListing = (toilet, db) => {
+  const owner = db.users.find(user => user.id === toilet.ownerId) || {
+    id: toilet.ownerId,
+    phone: '',
+    name: 'Unknown',
+    city: '',
+    profileCompleted: false,
+    favoriteToiletIds: [],
+  };
+  return {
+    ...toilet,
+    photos: rewritePhotoList(toilet.photos),
+    owner: publicUser(owner),
+    ownerBlocked: Boolean(owner.blocked),
+    bookingCount: db.bookings.filter(item => item.toiletId === toilet.id).length,
+    verified: Boolean(toilet.verified),
+    verifiedAt: toilet.verifiedAt || null,
+    verifiedBy: toilet.verifiedBy || null,
+    verificationNotes: toilet.verificationNotes || '',
+  };
+};
+
+const applyListingVerified = (toilet, { verified, admin, notes }) => {
+  const nextVerified = Boolean(verified);
+  return {
+    ...toilet,
+    verified: nextVerified,
+    verifiedAt: nextVerified ? new Date().toISOString() : null,
+    verifiedBy: nextVerified ? admin?.email || admin?.id || 'admin' : null,
+    verificationNotes: String(notes || '').trim(),
+  };
+};
+
 const overview = db => {
   const owners = ownerIds(db);
   const txns = db.transactions.map(publicTransaction);
@@ -53,6 +88,8 @@ const overview = db => {
     owners: [...owners].length,
     customers: db.users.filter(user => !owners.has(user.id)).length,
     listings: db.toilets.length,
+    verifiedListings: db.toilets.filter(item => item.verified).length,
+    pendingListings: db.toilets.filter(item => !item.verified).length,
     bookings: db.bookings.length,
     reviews: db.reviews.length,
     earnings: summarizeTransactions(txns, { toilets: db.toilets, bookings: db.bookings }),
@@ -61,4 +98,4 @@ const overview = db => {
   };
 };
 
-module.exports = { ownerIds, enrichUser, enrichOwner, overview };
+module.exports = { ownerIds, enrichUser, enrichOwner, overview, mapAdminListing, applyListingVerified };

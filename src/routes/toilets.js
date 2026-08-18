@@ -1,7 +1,7 @@
 const express = require('express');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
-const { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters } = require('../services/toilets');
+const { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilters, sanitizeOwnerToiletPayload } = require('../services/toilets');
 const { facilityValues } = require('../services/master');
 const { listFavoriteToilets, toggleFavorite } = require('../services/favorites');
 const { parseToiletPhotos } = require('../middleware/upload');
@@ -142,6 +142,9 @@ router.post('/', (req, res, next) => {
         rating: 0,
         reviewCount: 0,
         verified: false,
+        verifiedAt: null,
+        verifiedBy: null,
+        verificationNotes: '',
         availability: payload.availability || (db.master?.availability || []).find(item => item.active !== false)?.value || 'AVAILABLE',
         distanceKm: 0,
         priceLabel: 'Per use',
@@ -177,8 +180,7 @@ router.post('/', (req, res, next) => {
 router.put('/:toiletId', async (req, res, next) => {
   try {
     const { toiletId } = req.params;
-    const payload = { ...(req.body || {}) };
-    delete payload.id;
+    const payload = sanitizeOwnerToiletPayload(req.body || {});
     if (payload.enabled != null) {
       payload.enabled = payload.enabled !== false;
     }
@@ -196,7 +198,21 @@ router.put('/:toiletId', async (req, res, next) => {
         removedPhotos = removedPhotoUrls(toilet.photos, payload.photos);
       }
       db.toilets = db.toilets.map(item =>
-        item.id === toiletId ? { ...item, ...payload, id: toiletId, ownerId: item.ownerId, priceLabel: 'Per use' } : item,
+        item.id === toiletId
+          ? {
+              ...item,
+              ...payload,
+              id: toiletId,
+              ownerId: item.ownerId,
+              verified: Boolean(item.verified),
+              verifiedAt: item.verifiedAt || null,
+              verifiedBy: item.verifiedBy || null,
+              verificationNotes: item.verificationNotes || '',
+              rating: item.rating,
+              reviewCount: item.reviewCount,
+              priceLabel: 'Per use',
+            }
+          : item,
       );
       return db;
     });
