@@ -15,6 +15,37 @@ const publicBaseUrl = () => String(config.s3PublicBaseUrl || '').replace(/\/$/, 
 const isS3Configured = () =>
   Boolean(config.awsAccessKeyId && config.awsSecretAccessKey && config.s3Bucket && config.awsRegion);
 
+const isCustomS3Endpoint = endpoint => {
+  const value = String(endpoint || '').trim();
+  if (!value) return false;
+  // Public bucket URLs and AWS regional hosts are not custom APIs. Using them
+  // with path-style addressing triggers PermanentRedirect.
+  if (/amazonaws\.com/i.test(value)) return false;
+  if (config.s3Bucket && value.includes(`${config.s3Bucket}.s3.`)) return false;
+  return true;
+};
+
+const mapS3Error = error => {
+  const name = String(error?.name || error?.Code || '');
+  const message = String(error?.message || '');
+  if (name === 'PermanentRedirect' || /specified endpoint/i.test(message)) {
+    return new HttpError(
+      503,
+      `S3 bucket region does not match AWS_REGION (${config.awsRegion}). Set AWS_REGION to the bucket's region and do not set S3_ENDPOINT on Railway.`,
+    );
+  }
+  if (name === 'InvalidAccessKeyId' || name === 'SignatureDoesNotMatch' || name === 'AccessDenied') {
+    return new HttpError(
+      503,
+      'S3 credentials were rejected. Check AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and bucket IAM permissions.',
+    );
+  }
+  if (name === 'NoSuchBucket') {
+    return new HttpError(503, `S3 bucket "${config.s3Bucket}" was not found.`);
+  }
+  return new HttpError(502, message || 'Could not upload photos to storage');
+};
+
 const getS3 = () => {
   if (!isS3Configured()) {
     throw new HttpError(503, 'Image storage is not configured. Set AWS S3 environment variables.');
@@ -22,12 +53,13 @@ const getS3 = () => {
   if (!s3Client) {
     const clientConfig = {
       region: config.awsRegion,
+      followRegionRedirects: true,
       credentials: {
         accessKeyId: config.awsAccessKeyId,
         secretAccessKey: config.awsSecretAccessKey,
       },
     };
-    if (config.s3Endpoint) {
+    if (isCustomS3Endpoint(config.s3Endpoint)) {
       clientConfig.endpoint = config.s3Endpoint;
       clientConfig.forcePathStyle = true;
     }
@@ -81,15 +113,19 @@ const uploadToiletPhotos = async ({ userId, files = [] }) => {
   for (const file of files) {
     const compressed = await compressImage(file.buffer);
     const key = `toilets/${userId}/${crypto.randomUUID()}.jpg`;
-    await client.send(
-      new PutObjectCommand({
-        Bucket: config.s3Bucket,
-        Key: key,
-        Body: compressed,
-        ContentType: 'image/jpeg',
-        CacheControl: 'public, max-age=31536000',
-      }),
-    );
+    try {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: config.s3Bucket,
+          Key: key,
+          Body: compressed,
+          ContentType: 'image/jpeg',
+          CacheControl: 'public, max-age=31536000',
+        }),
+      );
+    } catch (error) {
+      throw mapS3Error(error);
+    }
     urls.push(publicUrlForKey(key));
   }
 
