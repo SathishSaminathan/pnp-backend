@@ -50,8 +50,10 @@ const requireAuth = (req, _res, next) => {
     }
     if (isBlocked(user)) {
       const path = String(req.originalUrl || req.path || '').split('?')[0];
-      const allowBlockedProfile = req.method === 'GET' && /\/api\/profile\/?$/.test(path);
-      if (!allowBlockedProfile) {
+      const allowBlocked =
+        (req.method === 'GET' && /\/api\/profile\/?$/.test(path)) ||
+        (req.method === 'PUT' && /\/api\/profile\/device-token\/?$/.test(path));
+      if (!allowBlocked) {
         return next(new HttpError(403, 'This account has been blocked. Contact support.', { code: 'ACCOUNT_BLOCKED' }));
       }
     }

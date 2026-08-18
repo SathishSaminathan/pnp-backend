@@ -6,7 +6,8 @@ const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../mi
 const { ownerIds, enrichUser, enrichOwner, overview } = require('../services/admin');
 const { listFavoriteToilets } = require('../services/favorites');
 const { adminMaster, assertKey, normalizeItem } = require('../services/master');
-const { sendPushToUserId, sendToToken, sendToTopic } = require('../services/push');
+const { sendPushToUser, sendPushToUserId, sendToToken, sendToTopic } = require('../services/push');
+const { applyTemplate, listPublicTemplates } = require('../services/pushTemplates');
 
 const router = express.Router();
 
@@ -42,34 +43,47 @@ router.get('/me', (req, res) => {
   res.json({ success: true, data: { data: req.admin } });
 });
 
+router.get('/notifications/templates', (_req, res) => {
+  res.json({ items: listPublicTemplates() });
+});
+
 router.post('/notifications/push', async (req, res, next) => {
   try {
-    const title = String(req.body?.title || '').trim();
-    const body = String(req.body?.body || '').trim();
+    const templateId = String(req.body?.templateId || '').trim();
+    const vars = req.body?.vars && typeof req.body.vars === 'object' ? req.body.vars : {};
+    const applied = templateId ? applyTemplate(templateId, vars) : null;
+    const title = String(req.body?.title || applied?.title || '').trim();
+    const body = String(req.body?.body || applied?.body || '').trim();
     const userId = String(req.body?.userId || '').trim();
     const token = String(req.body?.token || req.body?.deviceToken || '').trim();
     const topic = req.body?.topic != null ? String(req.body.topic).trim() : '';
     const data = req.body?.data && typeof req.body.data === 'object' ? req.body.data : {};
+    const actionType = String(data.actionType || applied?.actionType || 'BROADCAST');
 
     if (!title || !body) {
       throw new HttpError(400, 'title and body are required');
     }
 
-    const payload = { title, body, data };
+    const payload = {
+      title,
+      body,
+      data: { actionType, ...data },
+    };
     let result;
 
     if (token) {
       result = await sendToToken(token, payload);
-    } else if (userId) {
-      result = await sendPushToUserId(userId, payload);
+    } else if (userId || applied?.audience === 'user') {
+      const targetUserId = userId;
+      if (!targetUserId) {
+        throw new HttpError(400, 'userId is required for this template');
+      }
+      result = await sendPushToUserId(targetUserId, payload);
     } else {
-      result = await sendToTopic(topic || config.fcmBroadcastTopic, {
-        ...payload,
-        data: { actionType: data.actionType || 'BROADCAST', ...data },
-      });
+      result = await sendToTopic(topic || config.fcmBroadcastTopic, payload);
     }
 
-    res.json({ ok: !result?.error && !result?.skipped, result });
+    res.json({ ok: !result?.error && !result?.skipped, result, payload });
   } catch (error) {
     next(error);
   }
@@ -93,7 +107,7 @@ router.get('/users', (req, res) => {
   res.json({ items, total: items.length });
 });
 
-const setUserBlocked = (req, res, next) => {
+const setUserBlocked = async (req, res, next) => {
   try {
     const blocked = Boolean(req.body?.blocked);
     const reason = String(req.body?.reason || '').trim();
@@ -115,7 +129,20 @@ const setUserBlocked = (req, res, next) => {
       return db;
     });
 
-    res.json(enrichUser(saved, readDb()));
+    const template = applyTemplate(blocked ? 'account_blocked' : 'account_enabled', {
+      name: saved.name || 'there',
+      reason: reason ? `. Reason: ${reason}.` : '.',
+    });
+    const push = await sendPushToUser(saved, {
+      title: template.title,
+      body: template.body,
+      data: { actionType: template.actionType, reason },
+    });
+
+    res.json({
+      ...enrichUser(saved, readDb()),
+      push,
+    });
   } catch (error) {
     next(error);
   }
