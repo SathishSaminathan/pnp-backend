@@ -5,7 +5,7 @@ const { isToiletEnabled, mapEnabledStatus, mapToilet, listToilets, discoveryFilt
 const { facilityValues } = require('../services/master');
 const { listFavoriteToilets, toggleFavorite } = require('../services/favorites');
 const { parseToiletPhotos } = require('../middleware/upload');
-const { deletePhotoUrls, normalizePhotoList, uploadToiletPhotos } = require('../services/uploads');
+const { deletePhotoUrls, normalizePhotoList, removedPhotoUrls, uploadToiletPhotos } = require('../services/uploads');
 
 const router = express.Router();
 
@@ -193,8 +193,7 @@ router.put('/:toiletId', async (req, res, next) => {
         throw new HttpError(403, 'You can only update your own listings');
       }
       if (payload.photos) {
-        const nextPhotos = new Set(payload.photos);
-        removedPhotos = (toilet.photos || []).filter(url => !nextPhotos.has(url));
+        removedPhotos = removedPhotoUrls(toilet.photos, payload.photos);
       }
       db.toilets = db.toilets.map(item =>
         item.id === toiletId ? { ...item, ...payload, id: toiletId, ownerId: item.ownerId, priceLabel: 'Per use' } : item,

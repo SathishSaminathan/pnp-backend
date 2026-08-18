@@ -11,11 +11,10 @@ const JPEG_QUALITY = 80;
 let s3Client = null;
 
 const publicBaseUrl = () => {
-  if (config.s3PublicBaseUrl) return config.s3PublicBaseUrl;
   if (config.s3Bucket && config.awsRegion) {
     return `https://${config.s3Bucket}.s3.${config.awsRegion}.amazonaws.com`;
   }
-  return '';
+  return String(config.s3PublicBaseUrl || '').replace(/\/$/, '');
 };
 
 const isS3Configured = () =>
@@ -79,6 +78,14 @@ const publicUrlForKey = key => `${publicBaseUrl()}/${key}`;
 const rewritePublicPhotoUrl = url => {
   const key = photoKeyFromUrl(url);
   return key ? publicUrlForKey(key) : url;
+};
+
+const removedPhotoUrls = (previous = [], next = []) => {
+  const keep = new Set((next || []).map(photoKeyFromUrl).filter(Boolean));
+  return (previous || []).filter(url => {
+    const key = photoKeyFromUrl(url);
+    return Boolean(key) && !keep.has(key);
+  });
 };
 
 const rewritePhotoList = photos =>
@@ -166,4 +173,5 @@ module.exports = {
   deletePhotoUrls,
   normalizePhotoList,
   rewritePhotoList,
+  removedPhotoUrls,
 };
