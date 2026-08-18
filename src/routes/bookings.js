@@ -78,6 +78,7 @@ router.post('/:bookingId/reviews', parseReviewPhotos, async (req, res, next) => 
       id: nextId('review'),
       bookingId: booking.id,
       toiletId: booking.toiletId,
+      userId: req.user.id,
       userName: req.user.name || 'PNP user',
       rating,
       cleanliness,

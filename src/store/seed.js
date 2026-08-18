@@ -33,6 +33,7 @@ const createSeed = () => {
       id: 'review_001',
       toiletId: 'toilet_001',
       bookingId: null,
+      userId: 'user_guest_arun',
       userName: 'Arun K',
       rating: 4.6,
       cleanliness: 5,
@@ -50,6 +51,7 @@ const createSeed = () => {
       id: 'review_002',
       toiletId: 'toilet_002',
       bookingId: null,
+      userId: 'user_guest_nisha',
       userName: 'Nisha P',
       rating: 4.2,
       cleanliness: 4,
@@ -59,6 +61,21 @@ const createSeed = () => {
       comment: 'Affordable and available late into the night.',
       photos: ['https://picsum.photos/seed/pnp-review-2a/800/500'],
       createdAt: '2026-08-12T12:00:00.000Z',
+    },
+    {
+      id: 'review_003',
+      toiletId: 'toilet_002',
+      bookingId: 'booking_002',
+      userId: 'user_001',
+      userName: 'Priya Raman',
+      rating: 4.5,
+      cleanliness: 5,
+      safety: 4,
+      facilities: 4,
+      valueForMoney: 5,
+      comment: 'Clean stall and easy access from the promenade. Would visit again.',
+      photos: ['https://picsum.photos/seed/pnp-review-3a/800/500'],
+      createdAt: '2026-08-16T14:20:00.000Z',
     },
   ];
 
@@ -184,7 +201,8 @@ const createSeed = () => {
       amount: 20,
       paymentStatus: 'PAID',
       bookingStatus: BOOKING_STATUS.COMPLETED,
-      reviewSubmitted: false,
+      reviewSubmitted: true,
+      reviewId: 'review_003',
     },
   ];
 
