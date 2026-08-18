@@ -1,5 +1,6 @@
 const { HttpError } = require('../utils');
 const { nextId } = require('../store/db');
+const { paginateItems, searchMatch, parseFlag } = require('./query');
 
 const MASTER_KEYS = ['categories', 'availability', 'facilities'];
 
@@ -20,6 +21,18 @@ const adminMaster = db => ({
   availability: sortItems(db.master?.availability),
   facilities: sortItems(db.master?.facilities),
 });
+
+const listMaster = (db, type, query = {}) => {
+  assertKey(type);
+  const search = query.search;
+  const active = parseFlag(query.active);
+  const items = sortItems(db.master?.[type]).filter(item => {
+    if (!searchMatch(search, [item.label, item.value, item.id])) return false;
+    if (active !== undefined && Boolean(item.active !== false) !== active) return false;
+    return true;
+  });
+  return paginateItems(items, query);
+};
 
 const facilityValues = db => publicMaster(db).facilities.map(item => item.value);
 
@@ -57,6 +70,7 @@ module.exports = {
   MASTER_KEYS,
   publicMaster,
   adminMaster,
+  listMaster,
   facilityValues,
   assertKey,
   normalizeItem,

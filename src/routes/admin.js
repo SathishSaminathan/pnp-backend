@@ -1,13 +1,13 @@
 const express = require('express');
 const config = require('../config');
-const { HttpError, publicUser } = require('../utils');
+const { HttpError } = require('../utils');
 const { readDb, updateDb } = require('../store/db');
 const { signAdminToken, safeEqual, adminProfile, requireAdmin } = require('../middleware/auth');
-const { ownerIds, enrichUser, enrichOwner, overview, mapAdminListing, applyListingVerified } = require('../services/admin');
-const { publicTransaction, publicBooking } = require('../services/payments');
+const { enrichUser, overview, mapAdminListing, applyListingVerified, listUsers, listOwners, listListings, listBookings, listTransactions, listReviews } = require('../services/admin');
+const { publicBooking } = require('../services/payments');
 const { listFavoriteToilets } = require('../services/favorites');
-const { rewritePhotoList, mapReview } = require('../services/uploads');
-const { adminMaster, assertKey, normalizeItem } = require('../services/master');
+const { rewritePhotoList } = require('../services/uploads');
+const { adminMaster, listMaster, assertKey, normalizeItem } = require('../services/master');
 const { sendPushToUser, sendPushToUserId, sendToToken, sendToTopic } = require('../services/push');
 const { applyTemplate, listPublicTemplates } = require('../services/pushTemplates');
 
@@ -101,17 +101,7 @@ router.get('/overview', (_req, res) => {
 });
 
 router.get('/users', (req, res) => {
-  const db = readDb();
-  const search = String(req.query.search || '').trim().toLowerCase();
-  const items = db.users
-    .map(user => enrichUser(user, db))
-    .filter(user => {
-      if (!search) return true;
-      return [user.name, user.phone, user.city, user.role].some(value =>
-        String(value || '').toLowerCase().includes(search),
-      );
-    });
-  res.json({ items, total: items.length });
+  res.json(listUsers(readDb(), req.query));
 });
 
 const setUserBlocked = async (req, res, next) => {
@@ -178,38 +168,11 @@ router.get('/users/:userId', (req, res, next) => {
 });
 
 router.get('/owners', (req, res) => {
-  const db = readDb();
-  const ids = ownerIds(db);
-  const search = String(req.query.search || '').trim().toLowerCase();
-  const items = db.users
-    .filter(user => ids.has(user.id))
-    .map(user => enrichOwner(user, db))
-    .filter(user => {
-      if (!search) return true;
-      return [user.name, user.phone, user.city].some(value => String(value || '').toLowerCase().includes(search));
-    });
-  res.json({ items, total: items.length });
+  res.json(listOwners(readDb(), req.query));
 });
 
 router.get('/listings', (req, res) => {
-  const db = readDb();
-  const ownerId = req.query.ownerId;
-  const search = String(req.query.search || '').trim().toLowerCase();
-  const verifiedFilter = String(req.query.verified || '').trim().toLowerCase();
-  const items = db.toilets
-    .filter(item => (!ownerId ? true : item.ownerId === ownerId))
-    .map(toilet => mapAdminListing(toilet, db))
-    .filter(item => {
-      if (verifiedFilter === 'true' || verifiedFilter === 'verified') return item.verified;
-      if (verifiedFilter === 'false' || verifiedFilter === 'pending' || verifiedFilter === 'unverified') return !item.verified;
-      return true;
-    })
-    .filter(item => {
-      if (!search) return true;
-      return [item.name, item.owner?.name, item.owner?.phone, item.address?.city, item.address?.area]
-        .some(value => String(value || '').toLowerCase().includes(search));
-    });
-  res.json({ items, total: items.length });
+  res.json(listListings(readDb(), req.query));
 });
 
 const setListingVerified = async (req, res, next) => {
@@ -257,16 +220,7 @@ router.put('/listings/:toiletId/verified', setListingVerified);
 router.post('/listings/:toiletId/verified', setListingVerified);
 
 router.get('/bookings', (req, res) => {
-  const db = readDb();
-  const status = req.query.status;
-  const items = db.bookings
-    .map(publicBooking)
-    .filter(item => (!status ? true : item.bookingStatus === status))
-    .map(booking => ({
-      ...booking,
-      user: publicUser(db.users.find(user => user.id === booking.userId) || { id: booking.userId, phone: '', name: 'Unknown', city: '', profileCompleted: false, favoriteToiletIds: [] }),
-    }));
-  res.json({ items, total: items.length });
+  res.json(listBookings(readDb(), req.query));
 });
 
 router.get('/earnings', (_req, res) => {
@@ -274,27 +228,24 @@ router.get('/earnings', (_req, res) => {
   res.json(overview(db).earnings);
 });
 
-router.get('/transactions', (_req, res) => {
-  const db = readDb();
-  const items = db.transactions.map(txn => ({
-    ...publicTransaction(txn),
-    owner: publicUser(db.users.find(user => user.id === txn.ownerId) || { id: txn.ownerId, phone: '', name: 'Unknown', city: '', profileCompleted: false, favoriteToiletIds: [] }),
-  }));
-  res.json({ items, total: items.length });
+router.get('/transactions', (req, res) => {
+  res.json(listTransactions(readDb(), req.query));
 });
 
-router.get('/reviews', (_req, res) => {
-  const db = readDb();
-  const items = db.reviews.map(review => ({
-    ...mapReview(review),
-    toiletName: db.toilets.find(item => item.id === review.toiletId)?.name || '',
-    user: publicUser(db.users.find(item => item.id === review.userId) || { name: review.userName || '', photoUrl: '' }),
-  }));
-  res.json({ items, total: items.length });
+router.get('/reviews', (req, res) => {
+  res.json(listReviews(readDb(), req.query));
 });
 
 router.get('/master', (_req, res) => {
   res.json(adminMaster(readDb()));
+});
+
+router.get('/master/:type', (req, res, next) => {
+  try {
+    res.json(listMaster(readDb(), req.params.type, req.query));
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post('/master/:type', (req, res, next) => {
