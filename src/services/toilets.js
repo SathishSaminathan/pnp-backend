@@ -1,4 +1,5 @@
 const { DISCOVERY_FILTER_DEFAULTS } = require('../constants');
+const { getSettings } = require('./settings');
 const { isBlocked, isOpenNow, parseBounds, parseOrigin, haversineKm, isInBounds, roundKm } = require('../utils');
 const { publicMaster } = require('./master');
 const { isFavorite } = require('./favorites');
@@ -50,8 +51,9 @@ const mapToilet = (toilet, user, reviews, origin, options = {}) => {
   return mapped;
 };
 
-const normalizeFilters = filters => ({
+const normalizeFilters = (filters, limits = {}) => ({
   ...DISCOVERY_FILTER_DEFAULTS,
+  ...limits,
   ...(filters || {}),
   availability: Array.isArray(filters?.availability) ? filters.availability : [],
   categories: Array.isArray(filters?.categories) ? filters.categories : [],
@@ -112,7 +114,9 @@ const listToilets = ({
 } = {}) => {
   const query = String(search || '').trim().toLowerCase();
   const tokens = parseSearchTokens(query);
-  const normalizedFilters = normalizeFilters(filters);
+  const discovery = getSettings(db).discovery;
+  const limits = { maxPrice: discovery.maxPrice, maxDistanceKm: discovery.maxDistanceKm };
+  const normalizedFilters = normalizeFilters(filters, limits);
   const normalizedOrigin = parseOrigin(origin);
   const hasBoundsPayload = Boolean(
     (bounds && typeof bounds === 'object') ||
@@ -137,9 +141,9 @@ const listToilets = ({
       if (normalizedFilters.favoritesOnly) return toilet.isFavorite;
       if (normalizedFilters.openNow && !isOpenNow(toilet.operatingHours)) return false;
       if (normalizedFilters.verifiedOnly && !toilet.verified) return false;
-      if (toilet.basePrice > Number(normalizedFilters.maxPrice || DISCOVERY_FILTER_DEFAULTS.maxPrice)) return false;
+      if (toilet.basePrice > Number(normalizedFilters.maxPrice || limits.maxPrice)) return false;
       if (toilet.rating < Number(normalizedFilters.minRating || 0)) return false;
-      if (!query && !normalizedBounds && toilet.distanceKm > Number(normalizedFilters.maxDistanceKm || DISCOVERY_FILTER_DEFAULTS.maxDistanceKm)) {
+      if (!query && !normalizedBounds && toilet.distanceKm > Number(normalizedFilters.maxDistanceKm || limits.maxDistanceKm)) {
         return false;
       }
       if (normalizedFilters.availability.length && !normalizedFilters.availability.includes(toilet.availability)) return false;
@@ -173,8 +177,9 @@ const discoveryFilters = db => {
     label: item.label,
     count: visibleToilets.filter(toilet => (toilet.facilities || []).includes(item.value)).length,
   }));
-  const maxPrice = Math.max(...visibleToilets.map(item => item.basePrice), DISCOVERY_FILTER_DEFAULTS.maxPrice);
-  const maxDistanceKm = Math.max(...visibleToilets.map(item => item.distanceKm), DISCOVERY_FILTER_DEFAULTS.maxDistanceKm);
+  const discovery = getSettings(db).discovery;
+  const maxPrice = Math.max(...visibleToilets.map(item => item.basePrice), discovery.maxPrice);
+  const maxDistanceKm = Math.max(...visibleToilets.map(item => item.distanceKm), discovery.maxDistanceKm);
 
   return {
     defaults: { ...DISCOVERY_FILTER_DEFAULTS, maxPrice, maxDistanceKm },
@@ -193,7 +198,7 @@ const discoveryFilters = db => {
     quickFilters: [
       { label: 'Open now', patch: { openNow: true } },
       { label: 'Verified', patch: { verifiedOnly: true } },
-      { label: 'Under ₹30', patch: { maxPrice: 30 } },
+      { label: `Under ₹${discovery.quickFilterMaxPrice}`, patch: { maxPrice: discovery.quickFilterMaxPrice } },
     ],
   };
 };

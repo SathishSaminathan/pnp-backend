@@ -27,6 +27,26 @@ const DISCOVERY_FILTER_DEFAULTS = {
   facilities: [],
 };
 
+// lucide icon names; the mobile app falls back to a tick for anything it does not know.
+const FACILITY_ICONS = {
+  'Water': 'droplets',
+  'Hand wash': 'droplets',
+  'Soap': 'sparkles',
+  'Toilet paper': 'scroll',
+  'Western toilet': 'toilet',
+  'Indian toilet': 'toilet',
+  'Wheelchair accessible': 'accessibility',
+  'Baby changing': 'baby',
+  'Shower': 'shower-head',
+  'Mirror': 'scan-face',
+  'Lighting': 'lightbulb',
+  'Lockable': 'lock',
+  'Regular cleaning': 'sparkles',
+  'Male': 'user',
+  'Female': 'user',
+  'Unisex': 'users',
+};
+
 const createDefaultMaster = () => ({
   categories: [
     { id: 'cat_premium', value: 'Premium', label: 'Premium', active: true, sortOrder: 1 },
@@ -59,6 +79,7 @@ const createDefaultMaster = () => ({
     id: `fac_${index + 1}`,
     value: label,
     label,
+    icon: FACILITY_ICONS[label] || '',
     active: true,
     sortOrder: index + 1,
   })),
@@ -67,6 +88,7 @@ const createDefaultMaster = () => ({
 const FACILITIES = createDefaultMaster().facilities.map(item => item.value);
 
 module.exports = {
+  FACILITY_ICONS,
   FACILITIES,
   BOOKING_STATUS,
   PAYMENT_STATUS,

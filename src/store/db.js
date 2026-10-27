@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const { createSeed } = require('./seed');
-const { createDefaultMaster } = require('../constants');
+const { createDefaultMaster, FACILITY_ICONS } = require('../constants');
 const { query, migrate, ping } = require('./postgres');
+const { mergeSettings } = require('../services/settings');
 
 const DATA_FILE = path.join(__dirname, '../../data/db.json');
 
@@ -21,6 +22,10 @@ const mergeMaster = db => {
       db.master[key] = defaults[key];
     }
   });
+  // Older databases predate icons: fill the gap once, never overwrite an admin's choice.
+  db.master.facilities = db.master.facilities.map(item =>
+    item.icon === undefined && FACILITY_ICONS[item.value] ? { ...item, icon: FACILITY_ICONS[item.value] } : item,
+  );
   return db;
 };
 
@@ -55,7 +60,7 @@ const mapUser = row => ({
 });
 
 const loadFromPostgres = async () => {
-  const [users, toilets, bookings, reviews, notifications, transactions, masterRows, favorites] = await Promise.all([
+  const [users, toilets, bookings, reviews, notifications, transactions, masterRows, favorites, settingsRows] = await Promise.all([
     query('SELECT * FROM users ORDER BY created_at ASC, id ASC'),
     query('SELECT data FROM toilets'),
     query('SELECT data FROM bookings'),
@@ -64,6 +69,7 @@ const loadFromPostgres = async () => {
     query('SELECT data FROM transactions'),
     query('SELECT key, items FROM master_data'),
     query('SELECT user_id, toilet_id FROM user_favorites ORDER BY created_at ASC'),
+    query("SELECT value FROM app_settings WHERE key = 'app'"),
   ]);
 
   const master = createDefaultMaster();
@@ -91,6 +97,7 @@ const loadFromPostgres = async () => {
     notifications: notifications.rows.map(row => row.data),
     transactions: transactions.rows.map(row => row.data),
     master,
+    settings: mergeSettings(settingsRows.rows[0]?.value),
   });
 };
 
@@ -225,6 +232,12 @@ const persistToPostgres = async db => {
         [key, JSON.stringify(master[key] || [])],
       );
     }
+
+    await client.query(
+      `INSERT INTO app_settings (key, value) VALUES ('app', $1::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [JSON.stringify(mergeSettings(db.settings))],
+    );
 
     await client.query('COMMIT');
   } catch (error) {

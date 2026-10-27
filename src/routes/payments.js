@@ -1,10 +1,10 @@
 const express = require('express');
-const config = require('../config');
 const { BOOKING_STATUS, PAYMENT_STATUS, SETTLEMENT_STATUS } = require('../constants');
 const { HttpError } = require('../utils');
 const { readDb, updateDb, nextId } = require('../store/db');
 const { saveQuote, getQuote, saveOrder, getOrder } = require('../services/payments');
 const { sendPushToUserId } = require('../services/push');
+const { getSettings } = require('../services/settings');
 
 const router = express.Router();
 
@@ -27,6 +27,7 @@ router.post('/quote', (req, res, next) => {
     }
 
     const amount = Number(toilet.basePrice);
+    const { platformFee } = getSettings(db);
     const quote = saveQuote({
       quoteId: nextId('quote'),
       toiletId,
@@ -35,8 +36,8 @@ router.post('/quote', (req, res, next) => {
       time,
       duration: 'Per use',
       amount,
-      platformFee: config.platformFee,
-      totalAmount: amount + config.platformFee,
+      platformFee,
+      totalAmount: amount + platformFee,
     });
     res.json(quote);
   } catch (error) {
@@ -100,8 +101,9 @@ router.post('/verify', (req, res, next) => {
       reviewSubmitted: false,
     };
 
-    const taxAmount = 2;
-    const platformFee = Number(quote.platformFee || config.platformFee);
+    const settings = getSettings(db);
+    const taxAmount = settings.taxAmount;
+    const platformFee = Number(quote.platformFee ?? settings.platformFee);
     const address = toilet.address || {};
     const transaction = {
       id: nextId('txn'),

@@ -58,6 +58,20 @@ const normalizeItem = (key, payload, existing = {}) => {
     sortOrder: Number(payload.sortOrder || existing.sortOrder || 0),
   };
 
+  // Optional extras. `icon` is a lucide icon name; `labels` maps language code -> translated label.
+  if (payload.icon !== undefined || existing.icon) {
+    item.icon = String(payload.icon ?? existing.icon ?? '').trim();
+  }
+  if (payload.labels !== undefined || existing.labels) {
+    const source = payload.labels !== undefined ? payload.labels : existing.labels;
+    const labels = {};
+    Object.entries(source && typeof source === 'object' ? source : {}).forEach(([lang, text]) => {
+      const clean = String(text || '').trim();
+      if (/^[a-z]{2}$/i.test(lang) && clean) labels[lang.toLowerCase()] = clean;
+    });
+    item.labels = labels;
+  }
+
   if (key === 'availability') {
     item.color = payload.color || existing.color || '#6B7280';
     item.bg = payload.bg || existing.bg || '#F3F4F6';

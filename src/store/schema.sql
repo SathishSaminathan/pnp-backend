@@ -66,6 +66,11 @@ CREATE TABLE IF NOT EXISTS master_data (
   items JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
 CREATE TABLE IF NOT EXISTS user_favorites (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   toilet_id TEXT NOT NULL REFERENCES toilets(id) ON DELETE CASCADE,

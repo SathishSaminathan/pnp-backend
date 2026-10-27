@@ -7,7 +7,8 @@ const { enrichUser, overview, mapAdminListing, applyListingVerified, listUsers, 
 const { publicBooking } = require('../services/payments');
 const { listFavoriteToilets } = require('../services/favorites');
 const { rewritePhotoList } = require('../services/uploads');
-const { adminMaster, listMaster, assertKey, normalizeItem } = require('../services/master');
+const { adminMaster, listMaster, assertKey, normalizeItem, publicMaster } = require('../services/master');
+const { getSettings, applySettingsUpdate } = require('../services/settings');
 const { sendPushToUser, sendPushToUserId, sendToToken, sendToTopic } = require('../services/push');
 const { applyTemplate, listPublicTemplates } = require('../services/pushTemplates');
 
@@ -218,6 +219,74 @@ const setListingVerified = async (req, res, next) => {
 router.patch('/listings/:toiletId/verified', setListingVerified);
 router.put('/listings/:toiletId/verified', setListingVerified);
 router.post('/listings/:toiletId/verified', setListingVerified);
+
+const EDITABLE_HOURS = /^(24\s*hours?|\d{1,2}:\d{2}\s?(AM|PM)\s?[-–]\s?\d{1,2}:\d{2}\s?(AM|PM))$/i;
+
+// Admin edit of a listing's commercial fields. Owner-locked fields (verification, rating) stay untouched.
+router.patch('/listings/:toiletId', (req, res, next) => {
+  try {
+    const body = req.body || {};
+    let saved;
+
+    updateDb(db => {
+      const toilet = db.toilets.find(item => item.id === req.params.toiletId);
+      if (!toilet) throw new HttpError(404, 'Toilet not found');
+      const master = publicMaster(db);
+      const next = { ...toilet };
+
+      if (body.basePrice !== undefined) {
+        const price = Number(body.basePrice);
+        if (!Number.isFinite(price) || price < 0) throw new HttpError(400, 'Price must be 0 or more');
+        next.basePrice = price;
+      }
+      if (body.operatingHours !== undefined) {
+        const hours = String(body.operatingHours).trim();
+        if (!EDITABLE_HOURS.test(hours)) throw new HttpError(400, 'Hours must look like "06:00 AM - 10:00 PM" or "24 Hours"');
+        next.operatingHours = hours;
+      }
+      if (body.availability !== undefined) {
+        if (!master.availability.some(item => item.value === body.availability)) {
+          throw new HttpError(400, 'Unknown availability');
+        }
+        next.availability = body.availability;
+      }
+      if (body.category !== undefined) {
+        if (!master.categories.some(item => item.value === body.category)) throw new HttpError(400, 'Unknown category');
+        next.category = body.category;
+      }
+      if (body.enabled !== undefined) {
+        if (typeof body.enabled !== 'boolean') throw new HttpError(400, 'enabled must be a boolean');
+        next.enabled = body.enabled;
+      }
+
+      saved = next;
+      db.toilets = db.toilets.map(item => (item.id === toilet.id ? next : item));
+      return db;
+    });
+
+    res.json(mapAdminListing(saved, readDb()));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/settings', (_req, res) => {
+  res.json(getSettings(readDb()));
+});
+
+router.put('/settings', (req, res, next) => {
+  try {
+    let saved;
+    updateDb(db => {
+      saved = applySettingsUpdate(db.settings, req.body || {});
+      db.settings = saved;
+      return db;
+    });
+    res.json(saved);
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get('/bookings', (req, res) => {
   res.json(listBookings(readDb(), req.query));
