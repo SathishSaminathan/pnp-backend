@@ -4,6 +4,7 @@ const { createSeed } = require('./seed');
 const { createDefaultMaster, FACILITY_ICONS } = require('../constants');
 const { query, migrate, ping } = require('./postgres');
 const { mergeSettings } = require('../services/settings');
+const { syncReviewStats } = require('../services/reviewStats');
 
 const DATA_FILE = path.join(__dirname, '../../data/db.json');
 
@@ -261,12 +262,12 @@ const initStore = async () => {
   await migrate();
   const count = await query('SELECT COUNT(*)::int AS count FROM users');
   if (!count.rows[0].count) {
-    const imported = importLegacyJson() || mergeMaster(createSeed());
+    const imported = syncReviewStats(importLegacyJson() || mergeMaster(createSeed()));
     await persistToPostgres(imported);
     cache = imported;
     console.log(`Postgres seeded with ${imported.users.length} users`);
   } else {
-    cache = await loadFromPostgres();
+    cache = syncReviewStats(await loadFromPostgres());
     console.log(`Postgres connected · ${cache.users.length} users`);
   }
   ready = true;
@@ -290,7 +291,7 @@ const persist = db => {
 
 const updateDb = mutator => {
   const db = readDb();
-  const next = mutator(db) || db;
+  const next = syncReviewStats(mutator(db) || db);
   persist(next);
   return next;
 };

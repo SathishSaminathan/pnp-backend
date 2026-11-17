@@ -1,5 +1,6 @@
 const { DISCOVERY_FILTER_DEFAULTS } = require('../constants');
 const { getSettings } = require('./settings');
+const { ratingBreakdown } = require('./reviewStats');
 const { isBlocked, isOpenNow, parseBounds, parseOrigin, haversineKm, isInBounds, roundKm } = require('../utils');
 const { publicMaster } = require('./master');
 const { isFavorite } = require('./favorites');
@@ -44,9 +45,9 @@ const mapToilet = (toilet, user, reviews, origin, options = {}) => {
     photos: rewritePhotoList(toilet.photos),
   };
   if (options.includeReviews) {
-    mapped.reviews = (reviews || [])
-      .filter(review => review.toiletId === toilet.id)
-      .map(review => ({ ...review, photos: rewritePhotoList(review.photos || []) }));
+    const own = (reviews || []).filter(review => review.toiletId === toilet.id);
+    mapped.reviews = own.map(review => ({ ...review, photos: rewritePhotoList(review.photos || []) }));
+    mapped.ratingBreakdown = ratingBreakdown(own);
   }
   return mapped;
 };

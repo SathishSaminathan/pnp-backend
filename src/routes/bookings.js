@@ -64,6 +64,9 @@ router.post('/:bookingId/reviews', parseReviewPhotos, async (req, res, next) => 
     }
 
     const rating = Number(payload.rating || 0);
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      throw new HttpError(400, 'Rating must be between 1 and 5');
+    }
     const cleanliness = Number(payload.cleanliness || 0);
     const safety = Number(payload.safety || 0);
     const facilities = Number(payload.facilities || 0);
